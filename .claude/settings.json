@@ -1,0 +1,17 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "cmd=$(jq -r '.tool_input.command'); if echo \"$cmd\" | grep -qE '^git commit'; then go test ./... && golangci-lint run ./... || echo '{\"continue\":false,\"stopReason\":\"Pre-commit checks failed — fix test or lint errors before committing.\"}'; fi",
+            "timeout": 120,
+            "statusMessage": "Running tests and lint before commit..."
+          }
+        ]
+      }
+    ]
+  }
+}

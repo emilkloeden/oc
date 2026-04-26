@@ -65,7 +65,9 @@ version = "0.1.0"
 [ocaml]
 version = "5.2.0"
 `
-	os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(content), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 	_, err := project.LoadConfig(dir)
 	if err == nil {
 		t.Fatal("expected error when project name is missing")
@@ -116,7 +118,9 @@ version = "5.0.0"
 name = "lwt"
 version = "5.7.0"
 `
-	os.WriteFile(filepath.Join(dir, "oc.lock"), []byte(content), 0644)
+	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte(content), 0644); err != nil {
+		t.Fatal(err)
+	}
 
 	lock, err := project.LoadLock(dir)
 	if err != nil {

@@ -28,7 +28,9 @@ func TestNew_InitializesGitRepo(t *testing.T) {
 
 func TestNew_GitignoreExcludesOcamlDir(t *testing.T) {
 	dir := t.TempDir()
-	cmd.RunNew(dir, "my_app", false)
+	if err := cmd.RunNew(dir, "my_app", false); err != nil {
+		t.Fatal(err)
+	}
 
 	gitignore := filepath.Join(dir, "my_app", ".gitignore")
 	content, err := os.ReadFile(gitignore)
@@ -79,7 +81,9 @@ func TestNew_LibFlag(t *testing.T) {
 
 func TestNew_FailsIfDirExists(t *testing.T) {
 	dir := t.TempDir()
-	os.MkdirAll(filepath.Join(dir, "my_app"), 0755)
+	if err := os.MkdirAll(filepath.Join(dir, "my_app"), 0755); err != nil {
+		t.Fatal(err)
+	}
 
 	err := cmd.RunNew(dir, "my_app", false)
 	if err == nil {

@@ -98,7 +98,9 @@ func TestEnsureSymlink_UpdatesStaleLink(t *testing.T) {
 	newTarget := t.TempDir()
 
 	// create initial symlink
-	os.Symlink(old, filepath.Join(projectDir, ".ocaml"))
+	if err := os.Symlink(old, filepath.Join(projectDir, ".ocaml")); err != nil {
+		t.Fatal(err)
+	}
 
 	if err := sw.EnsureSymlink(projectDir, newTarget); err != nil {
 		t.Fatalf("EnsureSymlink update: %v", err)

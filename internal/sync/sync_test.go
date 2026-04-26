@@ -65,7 +65,9 @@ func TestEnsureWith_SkipsCreate_WhenSwitchExists(t *testing.T) {
 	runner := &mockRunner{switches: map[string]bool{}}
 
 	// first call creates
-	sync.EnsureWith(dir, cfg("5.2.0"), runner)
+	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+		t.Fatal(err)
+	}
 	// second call should reuse
 	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
 		t.Fatalf("second EnsureWith: %v", err)
@@ -160,13 +162,17 @@ func TestEnsureWith_ReusesSwitchPathAcrossCalls(t *testing.T) {
 	}
 
 	// First call: switch created, lock written with packages + switch path
-	sync.EnsureWith(dir, cfg("5.2.0"), runner)
+	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+		t.Fatal(err)
+	}
 
 	lock1, _ := project.LoadLock(dir)
 	path1 := lock1.SwitchPath
 
 	// Second call: packages now in lock → hash would differ without stored path
-	sync.EnsureWith(dir, cfg("5.2.0"), runner)
+	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+		t.Fatal(err)
+	}
 
 	lock2, _ := project.LoadLock(dir)
 	path2 := lock2.SwitchPath

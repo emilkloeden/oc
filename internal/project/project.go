@@ -72,7 +72,7 @@ func SaveConfig(dir string, cfg *Config) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return toml.NewEncoder(f).Encode(cfg)
 }
 
@@ -99,6 +99,6 @@ func SaveLock(dir string, lock *Lock) error {
 	if err != nil {
 		return err
 	}
-	defer f.Close()
+	defer func() { _ = f.Close() }()
 	return toml.NewEncoder(f).Encode(lock)
 }

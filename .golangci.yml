@@ -1,0 +1,10 @@
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      exclude-functions:
+        # fmt.Fprint* return (n int, err error); ignoring these is idiomatic Go
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln

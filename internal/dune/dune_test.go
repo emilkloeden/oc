@@ -24,7 +24,9 @@ func TestScaffoldBin_CreatesFiles(t *testing.T) {
 
 func TestScaffoldBin_DuneProject(t *testing.T) {
 	dir := t.TempDir()
-	dune.ScaffoldBin(dir, "my_app")
+	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+		t.Fatal(err)
+	}
 
 	content := readFile(t, filepath.Join(dir, "dune-project"))
 	if !strings.Contains(content, "(lang dune") {
@@ -37,7 +39,9 @@ func TestScaffoldBin_DuneProject(t *testing.T) {
 
 func TestScaffoldBin_BinDune(t *testing.T) {
 	dir := t.TempDir()
-	dune.ScaffoldBin(dir, "my_app")
+	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+		t.Fatal(err)
+	}
 
 	content := readFile(t, filepath.Join(dir, "bin/dune"))
 	if !strings.Contains(content, "(executable") {
@@ -50,7 +54,9 @@ func TestScaffoldBin_BinDune(t *testing.T) {
 
 func TestScaffoldBin_MainML(t *testing.T) {
 	dir := t.TempDir()
-	dune.ScaffoldBin(dir, "my_app")
+	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+		t.Fatal(err)
+	}
 
 	content := readFile(t, filepath.Join(dir, "bin/main.ml"))
 	if !strings.Contains(content, `print_endline`) {
@@ -73,7 +79,9 @@ func TestScaffoldLib_CreatesFiles(t *testing.T) {
 
 func TestScaffoldLib_LibDune(t *testing.T) {
 	dir := t.TempDir()
-	dune.ScaffoldLib(dir, "my_lib")
+	if err := dune.ScaffoldLib(dir, "my_lib"); err != nil {
+		t.Fatal(err)
+	}
 
 	content := readFile(t, filepath.Join(dir, "lib/dune"))
 	if !strings.Contains(content, "(library") {

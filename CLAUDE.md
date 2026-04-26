@@ -4,7 +4,19 @@
 
 `oc` is a Go CLI tool that wraps [opam](https://opam.ocaml.org) and [dune](https://dune.build) to give OCaml a Cargo-like developer experience. It manages per-project opam switches transparently, generates opam files from `oc.toml`, and keeps a lockfile of resolved package versions.
 
-## Build and test
+## Development workflow
+
+### TDD is required
+
+Always follow the red-green cycle:
+1. Write a failing test that describes the behaviour you want.
+2. Confirm it fails (`go test ./...`).
+3. Write the minimum implementation to make it pass.
+4. Confirm it passes, then move on.
+
+Do not write implementation code before a failing test exists.
+
+### Build and test
 
 ```sh
 # Build
@@ -18,6 +30,17 @@ go test -tags integration -timeout 20m .
 ```
 
 Go 1.26+ is required. `opam` and `git` must be on `PATH` at runtime but are not needed to compile.
+
+### Pre-commit checks (automated)
+
+A Claude Code hook in `.claude/settings.json` intercepts every `git commit` command and runs:
+
+```sh
+go test ./...
+golangci-lint run ./...
+```
+
+The commit is blocked if either command fails. Fix the reported errors and try again.
 
 ## Architecture
 

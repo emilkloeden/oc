@@ -43,7 +43,7 @@ var removeCmd = &cobra.Command{
 		}
 
 		fmt.Printf("Removing %s...\n", pkg)
-		exec.Run("opam", []string{"remove", pkg, "--yes"}, exec.Options{Dir: dir})
+		_ = exec.Run("opam", []string{"remove", pkg, "--yes"}, exec.Options{Dir: dir})
 
 		fmt.Printf("Removed %q from dependencies.\n", pkg)
 		return nil

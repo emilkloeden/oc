@@ -97,8 +97,8 @@ func gitMaintainer() string {
 
 func initGit(dir string) {
 	// Non-fatal: git may not be installed, and that's okay.
-	exec.Run("git", []string{"init", dir}, exec.Options{})
-	exec.Run("git", []string{"-C", dir, "add", "."}, exec.Options{})
+	_ = exec.Run("git", []string{"init", dir}, exec.Options{})
+	_ = exec.Run("git", []string{"-C", dir, "add", "."}, exec.Options{})
 }
 
 func init() {
