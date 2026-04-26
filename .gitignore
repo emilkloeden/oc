@@ -16,3 +16,7 @@ dist/
 .vscode/
 *.swp
 *.swo
+
+# Other
+initial.md
+
