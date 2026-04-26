@@ -42,6 +42,23 @@ golangci-lint run ./...
 
 The commit is blocked if either command fails. Fix the reported errors and try again.
 
+### Commit messages
+
+Use [Conventional Commits](https://www.conventionalcommits.org/):
+
+```
+feat: add oc upgrade command
+fix: correct switch path on second sync
+perf: cache opam list output
+refactor: extract version parsing
+test: add wildcard constraint case
+docs: update README install steps
+chore: bump BurntSushi/toml to v1.5
+ci: pin golangci-lint to v2.11
+```
+
+`docs:`, `test:`, `chore:`, `ci:` are excluded from release changelogs. Use `feat:`, `fix:`, `perf:` for anything users should see. Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
+
 ## Architecture
 
 ```
