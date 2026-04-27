@@ -6,13 +6,27 @@ A Cargo-like developer experience for OCaml. One command surface, zero manual sw
 
 ## Installation
 
-**Prerequisites:** [opam](https://opam.ocaml.org/doc/Install.html) and [git](https://git-scm.com) must be on your `PATH`. Go is only needed to build `oc` itself.
+**Prerequisites:** [opam](https://opam.ocaml.org/doc/Install.html) and [git](https://git-scm.com) must be on your `PATH`.
+
+### macOS / Linux (recommended)
 
 ```sh
-go install github.com/emilkloeden/oc@latest
+curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh
 ```
 
-Or build from source:
+Detects your OS and architecture, downloads the correct binary from the latest release, and installs to `/usr/local/bin` (uses `sudo` if needed). To install elsewhere:
+
+```sh
+INSTALL_DIR=~/.local/bin curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh
+```
+
+### Manual
+
+Download the binary for your platform from the [latest release](https://github.com/emilkloeden/oc/releases/latest), extract it, and place `oc` somewhere on your `PATH`.
+
+### Build from source
+
+Requires Go 1.22+.
 
 ```sh
 git clone https://github.com/emilkloeden/oc
@@ -73,14 +87,15 @@ Build and run the project binary.
 oc run
 ```
 
-### `oc add <package> [constraint]`
+### `oc add <package> [constraint] ...`
 
-Add a dependency.
+Add one or more dependencies.
 
 ```sh
-oc add cohttp            # any version
-oc add cohttp ">=5.0.0"  # with constraint
-oc add alcotest --dev    # dev-only dependency
+oc add cohttp                        # any version
+oc add cohttp ">=5.0.0"              # with constraint
+oc add cohttp-lwt-unix yojson lwt    # multiple packages at once
+oc add alcotest --dev                # dev-only dependency
 ```
 
 Updates `oc.toml`, regenerates `my_app.opam`, installs the package into the project switch, and writes the resolved versions to `oc.lock`.
