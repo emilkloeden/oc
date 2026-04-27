@@ -243,7 +243,6 @@ func TestGenerate_IncludesLicense(t *testing.T) {
 func TestGenerate_OmitsAuthorsWhenEmpty(t *testing.T) {
 	dir := t.TempDir()
 	c := cfg("my_app", map[string]string{}, map[string]string{})
-	// Authors left nil/empty
 	if err := opam.Generate(dir, c); err != nil {
 		t.Fatal(err)
 	}
@@ -251,6 +250,32 @@ func TestGenerate_OmitsAuthorsWhenEmpty(t *testing.T) {
 	content := readFile(t, filepath.Join(dir, "my_app.opam"))
 	if strings.Contains(content, "authors:") {
 		t.Error("authors: field should not be present when authors is empty")
+	}
+}
+
+func TestGenerate_OmitsHomepageWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	c := cfg("my_app", map[string]string{}, map[string]string{})
+	if err := opam.Generate(dir, c); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, filepath.Join(dir, "my_app.opam"))
+	if strings.Contains(content, "homepage:") {
+		t.Error("homepage: field should not be present when empty")
+	}
+}
+
+func TestGenerate_OmitsBugReportsWhenEmpty(t *testing.T) {
+	dir := t.TempDir()
+	c := cfg("my_app", map[string]string{}, map[string]string{})
+	if err := opam.Generate(dir, c); err != nil {
+		t.Fatal(err)
+	}
+
+	content := readFile(t, filepath.Join(dir, "my_app.opam"))
+	if strings.Contains(content, "bug-reports:") {
+		t.Error("bug-reports: field should not be present when empty")
 	}
 }
 

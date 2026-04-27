@@ -51,8 +51,6 @@ func RunNew(parent, name string, lib bool) error {
 			Version:    "0.1.0",
 			Maintainer: maintainer,
 			Authors:    authors,
-			Homepage:   "https://github.com/you/" + name,
-			BugReports: "https://github.com/you/" + name + "/issues",
 			License:    "MIT",
 		},
 		OCaml:           project.OCamlMeta{Version: "5.2.0"},
