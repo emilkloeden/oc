@@ -9,3 +9,4 @@ import (
 // Exported for testing only.
 var PrintEnvInfo = func(w io.Writer, lock *project.Lock) { printEnvInfo(w, lock) }
 var FindProjectRoot = findProjectRoot
+var BuildRunArgs = buildRunArgs

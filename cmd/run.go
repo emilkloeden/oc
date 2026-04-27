@@ -9,9 +9,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+func buildRunArgs(switchPath string, extraArgs ...string) []string {
+	args := []string{"exec", "--switch", switchPath, "--", "dune", "exec", "./bin/main.exe"}
+	if len(extraArgs) > 0 {
+		args = append(args, "--")
+		args = append(args, extraArgs...)
+	}
+	return args
+}
+
 var runCmd = &cobra.Command{
-	Use:   "run",
-	Short: "Build and run the project",
+	Use:                "run [-- args...]",
+	Short:              "Build and run the project",
+	DisableFlagParsing: true,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		dir, err := projectRoot()
 		if err != nil {
@@ -31,9 +41,7 @@ var runCmd = &cobra.Command{
 		switchPath := lock.SwitchPath
 
 		fmt.Println("Building and running...")
-		return exec.Run("opam", []string{
-			"exec", "--switch", switchPath, "--", "dune", "exec", "./bin/main.exe",
-		}, exec.Options{Dir: dir})
+		return exec.Run("opam", buildRunArgs(switchPath, args...), exec.Options{Dir: dir})
 	},
 }
 
