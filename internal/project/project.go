@@ -34,6 +34,12 @@ type Package struct {
 	Version string `toml:"version"`
 }
 
+// Dep represents a package name and its version constraint as parsed from CLI arguments.
+type Dep struct {
+	Name       string
+	Constraint string
+}
+
 type Lock struct {
 	OCaml      OCamlMeta `toml:"ocaml"`
 	SwitchPath string    `toml:"switch_path,omitempty"`
