@@ -28,6 +28,25 @@ func Generate(dir string, cfg *project.Config) error {
 	}
 	fmt.Fprintf(&b, "synopsis: %q\n", synopsis)
 	fmt.Fprintf(&b, "maintainer: %q\n", maintainer)
+	if len(cfg.Project.Authors) > 0 {
+		b.WriteString("authors: [")
+		for i, a := range cfg.Project.Authors {
+			if i > 0 {
+				b.WriteString(" ")
+			}
+			fmt.Fprintf(&b, "%q", a)
+		}
+		b.WriteString("]\n")
+	}
+	if cfg.Project.Homepage != "" {
+		fmt.Fprintf(&b, "homepage: %q\n", cfg.Project.Homepage)
+	}
+	if cfg.Project.BugReports != "" {
+		fmt.Fprintf(&b, "bug-reports: %q\n", cfg.Project.BugReports)
+	}
+	if cfg.Project.License != "" {
+		fmt.Fprintf(&b, "license: %q\n", cfg.Project.License)
+	}
 	b.WriteString("depends: [\n")
 
 	// ocaml and dune are always required

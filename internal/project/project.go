@@ -12,10 +12,14 @@ const configFile = "oc.toml"
 const lockFile = "oc.lock"
 
 type ProjectMeta struct {
-	Name       string `toml:"name"`
-	Version    string `toml:"version"`
-	Synopsis   string `toml:"synopsis,omitempty"`
-	Maintainer string `toml:"maintainer,omitempty"`
+	Name       string   `toml:"name"`
+	Version    string   `toml:"version"`
+	Synopsis   string   `toml:"synopsis,omitempty"`
+	Maintainer string   `toml:"maintainer,omitempty"`
+	Authors    []string `toml:"authors,omitempty"`
+	Homepage   string   `toml:"homepage,omitempty"`
+	BugReports string   `toml:"bug-reports,omitempty"`
+	License    string   `toml:"license,omitempty"`
 }
 
 type OCamlMeta struct {

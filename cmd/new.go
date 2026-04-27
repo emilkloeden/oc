@@ -39,11 +39,21 @@ func RunNew(parent, name string, lib bool) error {
 		return err
 	}
 
+	maintainer := gitMaintainer()
+	authors := []string{"Your Name <you@example.com>"}
+	if maintainer != "" {
+		authors = []string{maintainer}
+	}
+
 	cfg := &project.Config{
 		Project: project.ProjectMeta{
 			Name:       name,
 			Version:    "0.1.0",
-			Maintainer: gitMaintainer(),
+			Maintainer: maintainer,
+			Authors:    authors,
+			Homepage:   "https://github.com/you/" + name,
+			BugReports: "https://github.com/you/" + name + "/issues",
+			License:    "MIT",
 		},
 		OCaml:           project.OCamlMeta{Version: "5.2.0"},
 		Dependencies:    map[string]string{},
