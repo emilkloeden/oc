@@ -17,7 +17,7 @@ curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh
 Detects your OS and architecture, downloads the correct binary from the latest release, and installs to `/usr/local/bin` (uses `sudo` if needed). To install elsewhere:
 
 ```sh
-INSTALL_DIR=~/.local/bin curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh
+curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | INSTALL_DIR=~/.local/bin sh
 ```
 
 ### Manual
@@ -77,7 +77,7 @@ Sync dependencies and build.
 oc build
 ```
 
-Ensures the project switch exists, installs any missing deps, then runs `dune build`.
+Ensures the project switch exists, installs any missing dependencies, then runs `dune build`.
 
 ### `oc run`
 
@@ -160,11 +160,29 @@ alcotest = "*"
     └── a5ea70a0aa46624e/   ← shared by any project with this exact dep set
 ```
 
-## Running integration tests
+## Why oc?
 
-Unit tests (`go test ./...`) run without opam. Integration tests require opam to be initialised:
+Raw opam is powerful but manual. A typical project setup looks like:
 
 ```sh
-opam init --bare
-go test -tags integration -timeout 20m .
+opam switch create my_app 5.2.0
+eval $(opam env)
+opam install dune cohttp-lwt-unix
+dune init project my_app
 ```
+
+And that's before you've written a line of OCaml. Switch to a different project and repeat — or remember which switch you're on.
+
+With `oc`:
+
+```sh
+oc new my_app
+cd my_app
+oc run
+```
+
+`oc` handles switch creation, environment activation, and dependency installation automatically. It doesn't replace opam or dune — it orchestrates them so you don't have to.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for development setup, the TDD workflow this project follows, and how to run integration tests.
