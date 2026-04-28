@@ -1,8 +1,11 @@
 package project_test
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
+	"sync"
 	"testing"
 
 	"github.com/emilkloeden/oc/internal/project"
@@ -144,6 +147,66 @@ func TestLoadLock_Missing(t *testing.T) {
 	}
 	if len(lock.Packages) != 0 {
 		t.Errorf("expected empty packages, got %v", lock.Packages)
+	}
+}
+
+func TestLoadLock_CorruptedFile(t *testing.T) {
+	dir := t.TempDir()
+	// Write a file that is present but contains invalid TOML
+	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte("NOT VALID TOML ][[["), 0644); err != nil {
+		t.Fatal(err)
+	}
+	lock, err := project.LoadLock(dir)
+	if err == nil {
+		t.Fatal("expected error for corrupted oc.lock, got nil")
+	}
+	if lock != nil {
+		t.Errorf("expected nil lock on error, got %+v", lock)
+	}
+}
+
+func TestSaveLock_NoTempFilesLeftOnSuccess(t *testing.T) {
+	dir := t.TempDir()
+	lock := &project.Lock{OCaml: project.OCamlMeta{Version: "5.2.0"}}
+	if err := project.SaveLock(dir, lock); err != nil {
+		t.Fatal(err)
+	}
+
+	entries, err := os.ReadDir(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, e := range entries {
+		if strings.HasPrefix(e.Name(), ".oc.lock.") && strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind after SaveLock: %s", e.Name())
+		}
+	}
+}
+
+func TestSaveLock_ConcurrentWritesProduceValidFile(t *testing.T) {
+	dir := t.TempDir()
+
+	const goroutines = 50
+	var wg sync.WaitGroup
+	wg.Add(goroutines)
+
+	for i := 0; i < goroutines; i++ {
+		i := i
+		go func() {
+			defer wg.Done()
+			lock := &project.Lock{
+				OCaml:      project.OCamlMeta{Version: "5.2.0"},
+				SwitchPath: fmt.Sprintf("/path/to/switch/%d", i),
+				Packages:   []project.Package{{Name: "pkg", Version: fmt.Sprintf("1.0.%d", i)}},
+			}
+			_ = project.SaveLock(dir, lock)
+		}()
+	}
+	wg.Wait()
+
+	_, err := project.LoadLock(dir)
+	if err != nil {
+		t.Errorf("after concurrent SaveLock, oc.lock is not parseable: %v", err)
 	}
 }
 

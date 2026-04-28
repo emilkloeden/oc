@@ -105,10 +105,22 @@ func LoadLock(dir string) (*Lock, error) {
 
 func SaveLock(dir string, lock *Lock) error {
 	path := filepath.Join(dir, lockFile)
-	f, err := os.Create(path)
+
+	tmp, err := os.CreateTemp(dir, ".oc.lock.*.tmp")
 	if err != nil {
 		return err
 	}
-	defer func() { _ = f.Close() }()
-	return toml.NewEncoder(f).Encode(lock)
+	tmpPath := tmp.Name()
+
+	if err := toml.NewEncoder(tmp).Encode(lock); err != nil {
+		_ = tmp.Close()
+		_ = os.Remove(tmpPath)
+		return err
+	}
+	if err := tmp.Close(); err != nil {
+		_ = os.Remove(tmpPath)
+		return err
+	}
+
+	return os.Rename(tmpPath, path)
 }
