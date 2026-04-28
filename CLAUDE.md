@@ -29,7 +29,7 @@ go test ./...
 go test -tags integration -timeout 20m .
 ```
 
-Go 1.26+ is required. `opam` and `git` must be on `PATH` at runtime but are not needed to compile.
+Go 1.22+ is required. `opam` and `git` must be on `PATH` at runtime but are not needed to compile.
 
 ### Pre-commit checks (automated)
 

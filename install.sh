@@ -5,13 +5,16 @@ REPO="emilkloeden/oc"
 BIN="oc"
 INSTALL_DIR="${INSTALL_DIR:-/usr/local/bin}"
 
+echo "==> Installing oc — the Cargo-like experience for OCaml"
+echo ""
+
 # Detect OS
 OS="$(uname -s)"
 case "$OS" in
   Linux)  os="linux"  ;;
   Darwin) os="darwin" ;;
   *)
-    echo "Unsupported OS: $OS" >&2
+    echo "Error: unsupported OS: $OS" >&2
     exit 1
     ;;
 esac
@@ -22,25 +25,29 @@ case "$ARCH" in
   x86_64 | amd64) arch="x86_64" ;;
   arm64 | aarch64) arch="arm64"  ;;
   *)
-    echo "Unsupported architecture: $ARCH" >&2
+    echo "Error: unsupported architecture: $ARCH" >&2
     exit 1
     ;;
 esac
 
 # Resolve latest version (can be overridden: VERSION=v1.2.3 ./install.sh)
-VERSION="${VERSION:-$(curl -sSfL "https://api.github.com/repos/${REPO}/releases/latest" \
-  | grep '"tag_name"' \
-  | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')}"
-
 if [ -z "$VERSION" ]; then
-  echo "Could not determine latest release version." >&2
-  exit 1
+  printf "==> Fetching latest release ... "
+  VERSION="$(curl -sSfL "https://api.github.com/repos/${REPO}/releases/latest" \
+    | grep '"tag_name"' \
+    | sed 's/.*"tag_name": *"\([^"]*\)".*/\1/')"
+  if [ -z "$VERSION" ]; then
+    echo ""
+    echo "Error: could not determine latest release version." >&2
+    exit 1
+  fi
+  echo "$VERSION"
 fi
 
 TARBALL="${BIN}_${os}_${arch}.tar.gz"
 URL="https://github.com/${REPO}/releases/download/${VERSION}/${TARBALL}"
 
-echo "Installing ${BIN} ${VERSION} (${os}/${arch}) to ${INSTALL_DIR} ..."
+printf "==> Downloading %s %s (%s/%s) ... " "$BIN" "$VERSION" "$os" "$arch"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -48,16 +55,40 @@ trap 'rm -rf "$TMP"' EXIT
 curl -sSfL "$URL" | tar -xz -C "$TMP"
 
 if [ ! -f "${TMP}/${BIN}" ]; then
-  echo "Binary not found in archive." >&2
+  echo ""
+  echo "Error: binary not found in archive." >&2
   exit 1
 fi
+
+echo "done"
 
 chmod +x "${TMP}/${BIN}"
 
 if [ -w "$INSTALL_DIR" ]; then
+  printf "==> Installing to %s ... " "${INSTALL_DIR}/${BIN}"
   mv "${TMP}/${BIN}" "${INSTALL_DIR}/${BIN}"
+  echo "done"
 else
+  echo "==> Installing to ${INSTALL_DIR}/${BIN} (needs sudo) ..."
   sudo mv "${TMP}/${BIN}" "${INSTALL_DIR}/${BIN}"
 fi
 
-echo "Done. Run: ${BIN} --version"
+# Warn if INSTALL_DIR is not on PATH
+case ":${PATH}:" in
+  *":${INSTALL_DIR}:"*) ;;
+  *)
+    echo ""
+    echo "Warning: ${INSTALL_DIR} is not in your PATH."
+    echo "  Add this to your shell profile:"
+    echo "    export PATH=\"\$PATH:${INSTALL_DIR}\""
+    ;;
+esac
+
+echo ""
+echo "oc ${VERSION} installed. Get started:"
+echo ""
+echo "  oc new my_app        # create a new project"
+echo "  oc add cohttp        # add a dependency"
+echo "  oc build             # build your project"
+echo "  oc help              # see all commands"
+echo ""
