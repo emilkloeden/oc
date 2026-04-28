@@ -210,6 +210,7 @@ func TestSaveLock_ConcurrentWritesProduceValidFile(t *testing.T) {
 	}
 }
 
+
 func TestSaveLock_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
 	lock := &project.Lock{
