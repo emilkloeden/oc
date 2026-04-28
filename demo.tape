@@ -9,8 +9,10 @@ Set Padding 20
 Set TypingSpeed 80ms
 
 Hide
-# Clean prompt and temp working directory
 Type "export PS1='$ '"
+Enter
+Sleep 200ms
+Type "oc() { command oc $@ 2>/dev/null; }"
 Enter
 Sleep 200ms
 Type "cd $(mktemp -d)"
