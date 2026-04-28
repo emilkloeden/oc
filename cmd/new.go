@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 
 	"github.com/emilkloeden/oc/internal/dune"
@@ -12,6 +13,8 @@ import (
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/spf13/cobra"
 )
+
+var validProjectName = regexp.MustCompile(`^[a-zA-Z][a-zA-Z0-9_]*$`)
 
 var newLib bool
 
@@ -30,6 +33,10 @@ var newCmd = &cobra.Command{
 
 // RunNew creates a new project under parent/name. Extracted for testability.
 func RunNew(parent, name string, lib bool) error {
+	if !validProjectName.MatchString(name) {
+		return fmt.Errorf("invalid project name %q: must start with a letter and contain only letters, digits, and underscores", name)
+	}
+
 	dir := filepath.Join(parent, name)
 
 	if _, err := os.Stat(dir); err == nil {
@@ -38,6 +45,14 @@ func RunNew(parent, name string, lib bool) error {
 	if err := os.MkdirAll(dir, 0755); err != nil {
 		return err
 	}
+
+	// Clean up the created directory if any subsequent step fails.
+	success := false
+	defer func() {
+		if !success {
+			_ = os.RemoveAll(dir)
+		}
+	}()
 
 	maintainer := gitMaintainer()
 	authors := []string{"Your Name <you@example.com>"}
@@ -81,6 +96,7 @@ func RunNew(parent, name string, lib bool) error {
 	initGit(dir)
 
 	fmt.Printf("Created %q. Run:\n  cd %s\n  oc run\n", name, name)
+	success = true
 	return nil
 }
 
