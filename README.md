@@ -4,6 +4,8 @@ A Cargo-like developer experience for OCaml. One command surface, zero manual sw
 
 > **Goal:** "I didn't learn opam. I didn't learn dune. I just built something."
 
+![oc demo](docs/demo.gif)
+
 ## Installation
 
 **Prerequisites:** [opam](https://opam.ocaml.org/doc/Install.html) and [git](https://git-scm.com) must be on your `PATH`.
