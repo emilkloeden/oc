@@ -91,6 +91,54 @@ func TestNew_FailsIfDirExists(t *testing.T) {
 	}
 }
 
+func TestNew_InvalidNameReturnsError(t *testing.T) {
+	dir := t.TempDir()
+	cases := []string{
+		"my project",  // space
+		"123abc",      // starts with digit
+		"my-project",  // hyphen
+		"my.project",  // dot
+		"my(project",  // parens
+		"",            // empty
+	}
+	for _, name := range cases {
+		t.Run(name, func(t *testing.T) {
+			err := cmd.RunNew(dir, name, false)
+			if err == nil {
+				t.Errorf("expected error for name %q, got nil", name)
+			}
+		})
+	}
+}
+
+func TestNew_ValidNameSucceeds(t *testing.T) {
+	cases := []string{
+		"myapp",
+		"my_app",
+		"MyApp",
+		"app123",
+		"a",
+	}
+	for _, name := range cases {
+		t.Run(name, func(t *testing.T) {
+			subDir := t.TempDir()
+			if err := cmd.RunNew(subDir, name, false); err != nil {
+				t.Errorf("unexpected error for name %q: %v", name, err)
+			}
+		})
+	}
+}
+
+func TestNew_InvalidNameDoesNotCreateDir(t *testing.T) {
+	dir := t.TempDir()
+	name := "invalid name with spaces"
+	_ = cmd.RunNew(dir, name, false)
+	projectDir := filepath.Join(dir, name)
+	if _, err := os.Stat(projectDir); !os.IsNotExist(err) {
+		t.Errorf("expected no directory at %s after failed RunNew", projectDir)
+	}
+}
+
 func splitLines(s string) []string {
 	var lines []string
 	start := 0
