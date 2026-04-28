@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/emilkloeden/oc/internal/exec"
+	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
 	swmgr "github.com/emilkloeden/oc/internal/switch"
 )
@@ -68,6 +69,9 @@ func (r *realRunner) ListInstalled(switchPath string) ([]project.Package, error)
 
 // Ensure is the public entry point using the real opam runner.
 func Ensure(dir string, cfg *project.Config) error {
+	if err := opam.CheckOpam(); err != nil {
+		return err
+	}
 	return EnsureWith(dir, cfg, &realRunner{})
 }
 
