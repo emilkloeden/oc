@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>oc — Cargo for OCaml</title>
+  <meta name="description" content="oc gives OCaml a Cargo-like developer experience. Zero manual switch management — create a project, add dependencies, and build.">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --orange: #f38b00;
+      --orange-dark: #c97200;
+      --text: #1a1a1a;
+      --muted: #555;
+      --border: #e0e0e0;
+      --code-bg: #f5f5f5;
+      --max: 720px;
+    }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 1rem;
+      line-height: 1.6;
+      color: var(--text);
+      background: #fff;
+    }
+
+    a { color: var(--orange-dark); text-decoration: underline; }
+    a:hover { color: var(--orange); }
+
+    /* ── Layout ── */
+    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 1.5rem; }
+
+    /* ── Header ── */
+    header {
+      border-bottom: 1px solid var(--border);
+      padding: 1rem 0;
+    }
+    header .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      font-size: 1.25rem;
+      font-weight: 700;
+      color: var(--text);
+      text-decoration: none;
+      letter-spacing: -0.02em;
+    }
+    .logo span { color: var(--orange); }
+    nav a {
+      margin-left: 1.5rem;
+      font-size: 0.9rem;
+      color: var(--muted);
+      text-decoration: none;
+    }
+    nav a:hover { color: var(--orange); }
+
+    /* ── Hero ── */
+    .hero {
+      padding: 5rem 0 4rem;
+      text-align: center;
+    }
+    .hero h1 {
+      font-size: clamp(2rem, 5vw, 3rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.15;
+      margin-bottom: 1rem;
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--orange);
+    }
+    .hero p {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 520px;
+      margin: 0 auto 2rem;
+    }
+    .install-block {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.75rem;
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.75rem 1.25rem;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.9rem;
+    }
+    .install-block .prompt { color: var(--orange); user-select: none; }
+    .copy-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.75rem;
+      cursor: pointer;
+      color: var(--muted);
+    }
+    .copy-btn:hover { border-color: var(--orange); color: var(--orange); }
+
+    /* ── Quick start ── */
+    .quickstart { padding: 3rem 0; border-top: 1px solid var(--border); }
+    .quickstart h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .quickstart .sub {
+      color: var(--muted);
+      margin-bottom: 1.5rem;
+    }
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+      font-size: 0.875rem;
+      line-height: 1.7;
+    }
+    .cmd { color: var(--text); }
+    .comment { color: #999; }
+    .out { color: var(--muted); }
+
+    /* ── Features ── */
+    .features { padding: 3rem 0; border-top: 1px solid var(--border); }
+    .features h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 1.5rem;
+      letter-spacing: -0.02em;
+    }
+    .feature-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+    }
+    .feature-icon {
+      font-size: 1.4rem;
+      margin-bottom: 0.5rem;
+    }
+    .feature h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin-bottom: 0.35rem;
+    }
+    .feature p {
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+
+    /* ── Why oc? ── */
+    .why { padding: 3rem 0; border-top: 1px solid var(--border); }
+    .why h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .why .sub { color: var(--muted); margin-bottom: 1.5rem; }
+    .compare {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 1rem;
+    }
+    @media (max-width: 560px) { .compare { grid-template-columns: 1fr; } }
+    .compare-col h3 {
+      font-size: 0.8rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      margin-bottom: 0.5rem;
+      color: var(--muted);
+    }
+    .compare-col.good h3 { color: var(--orange); }
+
+    /* ── Install ── */
+    .install { padding: 3rem 0; border-top: 1px solid var(--border); }
+    .install h2 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      letter-spacing: -0.02em;
+    }
+    .install .sub { color: var(--muted); margin-bottom: 1.5rem; }
+    .install h3 {
+      font-size: 0.95rem;
+      font-weight: 700;
+      margin: 1.25rem 0 0.5rem;
+    }
+    .install p { font-size: 0.9rem; color: var(--muted); margin-bottom: 0.5rem; }
+    .prereqs {
+      font-size: 0.875rem;
+      color: var(--muted);
+      margin-bottom: 1.25rem;
+    }
+    .prereqs a { color: var(--orange-dark); }
+
+    /* ── Footer ── */
+    footer {
+      border-top: 1px solid var(--border);
+      padding: 2rem 0;
+      margin-top: 3rem;
+    }
+    footer .wrap {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 0.75rem;
+      font-size: 0.875rem;
+      color: var(--muted);
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--orange); }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div class="wrap">
+      <a class="logo" href="/oc"><span>oc</span></a>
+      <nav>
+        <a href="https://github.com/emilkloeden/oc">GitHub</a>
+        <a href="https://github.com/emilkloeden/oc#readme">Docs</a>
+        <a href="https://github.com/emilkloeden/oc/releases">Releases</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+
+    <!-- Hero -->
+    <section class="hero">
+      <div class="wrap">
+        <h1>A <em>Cargo-like</em> experience<br>for OCaml</h1>
+        <p>One command surface, zero manual switch management. <code>oc</code> orchestrates opam and dune so you never have to.</p>
+        <div class="install-block">
+          <span class="prompt">$</span>
+          <span id="install-cmd">curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh</span>
+          <button class="copy-btn" onclick="copyInstall()">copy</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Quick start -->
+    <section class="quickstart">
+      <div class="wrap">
+        <h2>Get started in three commands</h2>
+        <p class="sub">No switch setup. No environment sourcing. Just write OCaml.</p>
+        <pre><span class="comment"># Create a new project</span>
+<span class="cmd">$ oc new my_app</span>
+<span class="out">  Created my_app/</span>
+
+<span class="comment"># Add a dependency</span>
+<span class="cmd">$ oc add yojson</span>
+<span class="out">  Updated oc.toml</span>
+<span class="out">  Installed yojson 2.2.2</span>
+
+<span class="comment"># Build and run</span>
+<span class="cmd">$ oc run</span>
+<span class="out">  Hello, world!</span></pre>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section class="features">
+      <div class="wrap">
+        <h2>What oc handles for you</h2>
+        <div class="feature-grid">
+          <div class="feature">
+            <div class="feature-icon">⚡</div>
+            <h3>Zero switch management</h3>
+            <p>Every project gets an isolated opam switch, created and activated automatically.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">🔒</div>
+            <h3>Lockfile</h3>
+            <p><code>oc.lock</code> records exact installed versions. Commit it for reproducible builds across machines.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">♻️</div>
+            <h3>Shared switch cache</h3>
+            <p>Projects with identical dependencies share a single switch at <code>~/.cache/oc/switches/</code>. No redundant installs.</p>
+          </div>
+          <div class="feature">
+            <div class="feature-icon">📦</div>
+            <h3>Simple config</h3>
+            <p>One <code>oc.toml</code> file describes your project. The <code>.opam</code> file is generated — never edit it by hand.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Why oc? -->
+    <section class="why">
+      <div class="wrap">
+        <h2>Why oc?</h2>
+        <p class="sub">Setting up a new OCaml project without oc looks like this:</p>
+        <div class="compare">
+          <div class="compare-col bad">
+            <h3>Without oc</h3>
+            <pre><span class="cmd">opam switch create my_app 5.2.0</span>
+<span class="cmd">eval $(opam env)</span>
+<span class="cmd">opam install dune yojson</span>
+<span class="cmd">dune init project my_app</span></pre>
+          </div>
+          <div class="compare-col good">
+            <h3>With oc</h3>
+            <pre><span class="cmd">oc new my_app</span>
+<span class="cmd">oc add yojson</span>
+<span class="cmd">oc build</span></pre>
+          </div>
+        </div>
+        <p style="margin-top:1rem; font-size:0.9rem; color:var(--muted);">
+          oc doesn't replace opam or dune — it orchestrates them so you don't have to think about them.
+        </p>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section class="install">
+      <div class="wrap">
+        <h2>Installation</h2>
+        <p class="prereqs">
+          Requires <a href="https://opam.ocaml.org/doc/Install.html">opam</a> and
+          <a href="https://git-scm.com">git</a> on your <code>PATH</code>.
+        </p>
+
+        <h3>macOS / Linux</h3>
+        <pre><span class="cmd">curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | sh</span></pre>
+        <p>Installs to <code>/usr/local/bin</code>. To install elsewhere:</p>
+        <pre><span class="cmd">curl -sSfL https://raw.githubusercontent.com/emilkloeden/oc/main/install.sh | INSTALL_DIR=~/.local/bin sh</span></pre>
+
+        <h3>Manual</h3>
+        <p>Download the binary for your platform from the <a href="https://github.com/emilkloeden/oc/releases/latest">latest release</a>, extract it, and place <code>oc</code> on your <code>PATH</code>.</p>
+
+        <h3>Build from source</h3>
+        <p>Requires Go 1.22+.</p>
+        <pre><span class="cmd">git clone https://github.com/emilkloeden/oc</span>
+<span class="cmd">cd oc</span>
+<span class="cmd">go build -o ~/.local/bin/oc .</span></pre>
+      </div>
+    </section>
+
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <span>oc is open source under the <a href="https://github.com/emilkloeden/oc/blob/main/LICENSE">MIT License</a>.</span>
+      <span>
+        <a href="https://github.com/emilkloeden/oc">GitHub</a> ·
+        <a href="https://github.com/emilkloeden/oc#readme">Documentation</a> ·
+        <a href="https://github.com/emilkloeden/oc/releases">Releases</a>
+      </span>
+    </div>
+  </footer>
+
+  <script>
+    function copyInstall() {
+      const text = document.getElementById('install-cmd').textContent;
+      navigator.clipboard.writeText(text).then(() => {
+        const btn = document.querySelector('.copy-btn');
+        btn.textContent = 'copied!';
+        setTimeout(() => { btn.textContent = 'copy'; }, 2000);
+      });
+    }
+  </script>
+
+</body>
+</html>
