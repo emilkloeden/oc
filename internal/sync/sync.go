@@ -28,7 +28,7 @@ func (r *realRunner) SwitchExists(path string) bool {
 
 func (r *realRunner) CreateSwitch(path, ocamlVersion string) error {
 	if err := os.MkdirAll(path, 0755); err != nil {
-		return err
+		return fmt.Errorf("create switch directory: %w", err)
 	}
 	fmt.Printf("Creating OCaml %s switch (this may take a minute)...\n", ocamlVersion)
 	return exec.Run("opam", []string{
@@ -79,7 +79,7 @@ func Ensure(dir string, cfg *project.Config) error {
 func EnsureWith(dir string, cfg *project.Config, runner OpamRunner) error {
 	lock, err := project.LoadLock(dir)
 	if err != nil {
-		return err
+		return fmt.Errorf("load lockfile: %w", err)
 	}
 	// Detect OCaml version change — stale switch path must be discarded.
 	if lock.OCaml.Version != "" && lock.OCaml.Version != cfg.OCaml.Version {

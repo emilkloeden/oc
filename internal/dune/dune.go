@@ -10,30 +10,36 @@ const duneVersion = "3.0"
 
 func ScaffoldBin(dir, name string) error {
 	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name)); err != nil {
-		return err
+		return fmt.Errorf("write dune-project: %w", err)
 	}
 	binDir := filepath.Join(dir, "bin")
 	if err := os.MkdirAll(binDir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create bin directory: %w", err)
 	}
 	if err := writeIfAbsent(filepath.Join(binDir, "dune"), binDune(name)); err != nil {
-		return err
+		return fmt.Errorf("write bin/dune: %w", err)
 	}
-	return writeIfAbsent(filepath.Join(binDir, "main.ml"), mainML(name))
+	if err := writeIfAbsent(filepath.Join(binDir, "main.ml"), mainML(name)); err != nil {
+		return fmt.Errorf("write bin/main.ml: %w", err)
+	}
+	return nil
 }
 
 func ScaffoldLib(dir, name string) error {
 	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name)); err != nil {
-		return err
+		return fmt.Errorf("write dune-project: %w", err)
 	}
 	libDir := filepath.Join(dir, "lib")
 	if err := os.MkdirAll(libDir, 0755); err != nil {
-		return err
+		return fmt.Errorf("create lib directory: %w", err)
 	}
 	if err := writeIfAbsent(filepath.Join(libDir, "dune"), libDune(name)); err != nil {
-		return err
+		return fmt.Errorf("write lib/dune: %w", err)
 	}
-	return writeIfAbsent(filepath.Join(libDir, name+".ml"), libML(name))
+	if err := writeIfAbsent(filepath.Join(libDir, name+".ml"), libML(name)); err != nil {
+		return fmt.Errorf("write lib/%s.ml: %w", name, err)
+	}
+	return nil
 }
 
 func duneProject(name string) string {
