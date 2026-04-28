@@ -197,3 +197,30 @@ func TestEnsureWith_PropagatesCreateError(t *testing.T) {
 		t.Fatal("expected error when CreateSwitch fails")
 	}
 }
+
+func TestEnsureWith_NewSwitchOnOCamlVersionChange(t *testing.T) {
+	dir := t.TempDir()
+	runner := &mockRunner{switches: map[string]bool{}}
+
+	// First call with 5.2.0
+	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.createCalled) != 1 {
+		t.Fatalf("expected 1 CreateSwitch call, got %d", len(runner.createCalled))
+	}
+	path1 := runner.createCalled[0]
+
+	// Second call with a different OCaml version
+	if err := sync.EnsureWith(dir, cfg("5.3.0"), runner); err != nil {
+		t.Fatal(err)
+	}
+	if len(runner.createCalled) != 2 {
+		t.Fatalf("expected 2 CreateSwitch calls, got %d", len(runner.createCalled))
+	}
+	path2 := runner.createCalled[1]
+
+	if path1 == path2 {
+		t.Error("expected different switch paths for different OCaml versions")
+	}
+}

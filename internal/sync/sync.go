@@ -81,9 +81,11 @@ func EnsureWith(dir string, cfg *project.Config, runner OpamRunner) error {
 	if err != nil {
 		return err
 	}
-	if lock.OCaml.Version == "" {
-		lock.OCaml.Version = cfg.OCaml.Version
+	// Detect OCaml version change — stale switch path must be discarded.
+	if lock.OCaml.Version != "" && lock.OCaml.Version != cfg.OCaml.Version {
+		lock.SwitchPath = ""
 	}
+	lock.OCaml.Version = cfg.OCaml.Version
 
 	// Use the stored switch path if present and the switch still exists there.
 	// This keeps the path stable even after the lock is populated with packages
