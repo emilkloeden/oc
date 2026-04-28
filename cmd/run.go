@@ -27,22 +27,29 @@ var runCmd = &cobra.Command{
 		if err != nil {
 			return err
 		}
-
-		cfg, err := project.LoadConfig(dir)
-		if err != nil {
-			return err
-		}
-
-		if err := sync.Ensure(dir, cfg); err != nil {
-			return err
-		}
-
-		lock, _ := project.LoadLock(dir)
-		switchPath := lock.SwitchPath
-
-		fmt.Println("Building and running...")
-		return exec.Run("opam", buildRunArgs(switchPath, args...), exec.Options{Dir: dir})
+		return runRun(dir, args)
 	},
+}
+
+// runRun performs the build-and-run for the given project directory.
+func runRun(dir string, args []string) error {
+	cfg, err := project.LoadConfig(dir)
+	if err != nil {
+		return fmt.Errorf("load config: %w", err)
+	}
+
+	if err := sync.Ensure(dir, cfg); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+
+	lock, err := project.LoadLock(dir)
+	if err != nil {
+		return fmt.Errorf("load lockfile: %w", err)
+	}
+	switchPath := lock.SwitchPath
+
+	fmt.Println("Building and running...")
+	return exec.Run("opam", buildRunArgs(switchPath, args...), exec.Options{Dir: dir})
 }
 
 func init() {
