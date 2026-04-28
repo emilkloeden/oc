@@ -39,7 +39,10 @@ func EnsureSymlink(projectDir, target string) error {
 	info, err := os.Lstat(link)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return os.Symlink(target, link)
+			if err := os.Symlink(target, link); err != nil {
+				return fmt.Errorf("create symlink: %w", err)
+			}
+			return nil
 		}
 		return fmt.Errorf("stat .ocaml: %w", err)
 	}
