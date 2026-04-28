@@ -3,6 +3,7 @@ package swmgr_test
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	sw "github.com/emilkloeden/oc/internal/switch"
@@ -109,5 +110,39 @@ func TestEnsureSymlink_UpdatesStaleLink(t *testing.T) {
 	resolved, _ := os.Readlink(filepath.Join(projectDir, ".ocaml"))
 	if resolved != newTarget {
 		t.Errorf("symlink not updated: got %q want %q", resolved, newTarget)
+	}
+}
+
+func TestEnsureSymlink_RegularFileReturnsError(t *testing.T) {
+	projectDir := t.TempDir()
+	link := filepath.Join(projectDir, ".ocaml")
+	// Create a regular file (not a symlink) at .ocaml
+	if err := os.WriteFile(link, []byte("not a symlink"), 0644); err != nil {
+		t.Fatal(err)
+	}
+	target := t.TempDir()
+	err := sw.EnsureSymlink(projectDir, target)
+	if err == nil {
+		t.Fatal("expected error when .ocaml is a regular file, got nil")
+	}
+	if !strings.Contains(err.Error(), "remove it manually") {
+		t.Errorf("error should mention 'remove it manually' to guide the user; got: %v", err)
+	}
+}
+
+func TestEnsureSymlink_DirectoryReturnsError(t *testing.T) {
+	projectDir := t.TempDir()
+	link := filepath.Join(projectDir, ".ocaml")
+	// Create a directory at .ocaml
+	if err := os.MkdirAll(link, 0755); err != nil {
+		t.Fatal(err)
+	}
+	target := t.TempDir()
+	err := sw.EnsureSymlink(projectDir, target)
+	if err == nil {
+		t.Fatal("expected error when .ocaml is a directory, got nil")
+	}
+	if !strings.Contains(err.Error(), "remove it manually") {
+		t.Errorf("error should mention 'remove it manually' to guide the user; got: %v", err)
 	}
 }
