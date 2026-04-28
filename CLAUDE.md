@@ -31,6 +31,23 @@ go test -tags integration -timeout 20m .
 
 Go 1.22+ is required. `opam` and `git` must be on `PATH` at runtime but are not needed to compile.
 
+### Git and GitHub workflow
+
+**No direct commits to `main`.** All changes go through a branch and PR.
+
+**Docs-only changes** (README, CONTRIBUTING, install.sh, CLAUDE.md, docs/):
+- Branch name: `docs/<short-description>`
+- Open a PR; no issue required
+
+**Code changes** (anything in `cmd/`, `internal/`, `main.go`, tests):
+1. Raise a GitHub issue first: `gh issue create --repo emilkloeden/oc --title "..." --body "..."`
+2. If the change targets a specific release, assign it to the milestone: `--milestone "v0.x.0"`
+3. Create a branch: `git checkout -b feat/<description>` (match the commit type)
+4. Open a PR that closes the issue: include `Closes #N` in the PR body
+5. Merge with squash and delete the branch: `gh pr merge <N> --squash --delete-branch`
+
+**Milestones:** use `gh api repos/emilkloeden/oc/milestones --method POST --field title="v0.x.0"` to create milestones; assign issues to them so there is a clear record of what is targeted at each release.
+
 ### Pre-commit checks (automated)
 
 A Claude Code hook in `.claude/settings.json` intercepts every `git commit` command and runs:
@@ -58,6 +75,27 @@ ci: pin golangci-lint to v2.11
 ```
 
 `docs:`, `test:`, `chore:`, `ci:` are excluded from release changelogs. Use `feat:`, `fix:`, `perf:` for anything users should see. Breaking changes: `feat!:` with a `BREAKING CHANGE:` footer.
+
+### Releases
+
+Releases are automated via GoReleaser, triggered by pushing a `v*` tag:
+
+```sh
+# 1. Confirm CI is green on main
+# 2. Tag and push
+git tag v0.x.0
+git push origin v0.x.0
+```
+
+GoReleaser builds binaries for Linux/macOS/Windows (amd64 + arm64), creates a GitHub Release with archives and checksums, and generates a changelog from conventional commit prefixes. The version is baked into the binary at build time — the tag is the source of truth. Use semver (`v0.1.0`, `v0.2.0`, `v1.0.0`).
+
+### Documentation standards
+
+- Write "dependencies" in prose, never "deps"
+- When naming runtime prerequisites by name in documentation, link to their install page:
+  - [opam](https://opam.ocaml.org/doc/Install.html)
+  - [git](https://git-scm.com)
+- `go.mod` is the authoritative source for the minimum Go version; keep any version references in docs in sync with it
 
 ## Architecture
 
