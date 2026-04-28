@@ -49,7 +49,7 @@ var addCmd = &cobra.Command{
 
 		// sync.Ensure installs deps, updates the lockfile, and ensures the switch exists.
 		if err := sync.Ensure(dir, cfg); err != nil {
-			return err
+			return fmt.Errorf("sync: %w", err)
 		}
 
 		for _, d := range deps {
