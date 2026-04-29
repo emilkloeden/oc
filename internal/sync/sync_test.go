@@ -38,20 +38,11 @@ func (m *mockRunner) ListInstalled(switchPath string) ([]project.Package, error)
 	return m.installedPkgs, nil
 }
 
-func cfg(ocamlVer string) *project.Config {
-	return &project.Config{
-		Project:         project.ProjectMeta{Name: "test_app", Version: "0.1.0"},
-		OCaml:           project.OCamlMeta{Version: ocamlVer},
-		Dependencies:    map[string]string{},
-		DevDependencies: map[string]string{},
-	}
-}
-
 func TestEnsureWith_CreatesSwitch_WhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -65,11 +56,11 @@ func TestEnsureWith_SkipsCreate_WhenSwitchExists(t *testing.T) {
 	runner := &mockRunner{switches: map[string]bool{}}
 
 	// first call creates
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	// second call should reuse
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("second EnsureWith: %v", err)
 	}
 
@@ -82,7 +73,7 @@ func TestEnsureWith_CreatesSymlink(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -100,7 +91,7 @@ func TestEnsureWith_CallsInstallDeps(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -119,7 +110,7 @@ func TestEnsureWith_UpdatesLockfile(t *testing.T) {
 		},
 	}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -139,7 +130,7 @@ func TestEnsureWith_StoresSwitchPathInLock(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -162,7 +153,7 @@ func TestEnsureWith_ReusesSwitchPathAcrossCalls(t *testing.T) {
 	}
 
 	// First call: switch created, lock written with packages + switch path
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 
@@ -170,7 +161,7 @@ func TestEnsureWith_ReusesSwitchPathAcrossCalls(t *testing.T) {
 	path1 := lock1.SwitchPath
 
 	// Second call: packages now in lock → hash would differ without stored path
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 
@@ -192,7 +183,7 @@ func TestEnsureWith_PropagatesCreateError(t *testing.T) {
 		createErr: fmt.Errorf("opam failed"),
 	}
 
-	err := sync.EnsureWith(dir, cfg("5.2.0"), runner)
+	err := sync.EnsureWith(dir, "5.2.0", runner)
 	if err == nil {
 		t.Fatal("expected error when CreateSwitch fails")
 	}
@@ -203,7 +194,7 @@ func TestEnsureWith_NewSwitchOnOCamlVersionChange(t *testing.T) {
 	runner := &mockRunner{switches: map[string]bool{}}
 
 	// First call with 5.2.0
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	if len(runner.createCalled) != 1 {
@@ -212,7 +203,7 @@ func TestEnsureWith_NewSwitchOnOCamlVersionChange(t *testing.T) {
 	path1 := runner.createCalled[0]
 
 	// Second call with a different OCaml version
-	if err := sync.EnsureWith(dir, cfg("5.3.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.3.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	if len(runner.createCalled) != 2 {

@@ -12,6 +12,8 @@ import (
 	swmgr "github.com/emilkloeden/oc/internal/switch"
 )
 
+const defaultOCamlVersion = "5.2.0"
+
 type OpamRunner interface {
 	SwitchExists(path string) bool
 	CreateSwitch(path, ocamlVersion string) error
@@ -68,24 +70,33 @@ func (r *realRunner) ListInstalled(switchPath string) ([]project.Package, error)
 }
 
 // Ensure is the public entry point using the real opam runner.
-func Ensure(dir string, cfg *project.Config) error {
+// It reads the OCaml version from oc.lock, defaulting to 5.2.0 if absent.
+func Ensure(dir string) error {
 	if err := opam.CheckOpam(); err != nil {
 		return err
 	}
-	return EnsureWith(dir, cfg, &realRunner{})
+	lock, err := project.LoadLock(dir)
+	if err != nil {
+		return fmt.Errorf("load lockfile: %w", err)
+	}
+	ocamlVersion := lock.OCaml.Version
+	if ocamlVersion == "" {
+		ocamlVersion = defaultOCamlVersion
+	}
+	return EnsureWith(dir, ocamlVersion, &realRunner{})
 }
 
 // EnsureWith allows injection of a custom runner (used in tests).
-func EnsureWith(dir string, cfg *project.Config, runner OpamRunner) error {
+func EnsureWith(dir string, ocamlVersion string, runner OpamRunner) error {
 	lock, err := project.LoadLock(dir)
 	if err != nil {
 		return fmt.Errorf("load lockfile: %w", err)
 	}
 	// Detect OCaml version change — stale switch path must be discarded.
-	if lock.OCaml.Version != "" && lock.OCaml.Version != cfg.OCaml.Version {
+	if lock.OCaml.Version != "" && lock.OCaml.Version != ocamlVersion {
 		lock.SwitchPath = ""
 	}
-	lock.OCaml.Version = cfg.OCaml.Version
+	lock.OCaml.Version = ocamlVersion
 
 	// Use the stored switch path if present and the switch still exists there.
 	// This keeps the path stable even after the lock is populated with packages
@@ -96,7 +107,7 @@ func EnsureWith(dir string, cfg *project.Config, runner OpamRunner) error {
 	}
 
 	if !runner.SwitchExists(switchPath) {
-		if err := runner.CreateSwitch(switchPath, cfg.OCaml.Version); err != nil {
+		if err := runner.CreateSwitch(switchPath, ocamlVersion); err != nil {
 			return fmt.Errorf("create switch: %w", err)
 		}
 	}

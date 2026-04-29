@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/emilkloeden/oc/cmd"
-	"github.com/emilkloeden/oc/internal/opam"
+	"github.com/emilkloeden/oc/internal/dune"
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/emilkloeden/oc/internal/sync"
 )
@@ -23,7 +23,7 @@ func requireOpam(t *testing.T) {
 }
 
 // TestIntegration_NewCreatesValidProject verifies oc new produces a project
-// that opam and dune can understand.
+// that opam and dune can understand (via dune generating the .opam file).
 func TestIntegration_NewCreatesValidProject(t *testing.T) {
 	requireOpam(t)
 
@@ -34,14 +34,13 @@ func TestIntegration_NewCreatesValidProject(t *testing.T) {
 
 	projectDir := filepath.Join(dir, "hello")
 
-	// opam lint should accept the generated .opam file
-	out, err := runCmd(projectDir, "opam", "lint", "hello.opam")
-	if err != nil {
-		t.Fatalf("opam lint failed: %v\noutput: %s", err, out)
+	// dune-project should have generate_opam_files
+	if !dune.HasGenerateOpamFiles(projectDir) {
+		t.Error("dune-project missing (generate_opam_files true)")
 	}
 }
 
-// TestIntegration_SyncCreatesSwitch verifies EnsureWith (real runner) creates
+// TestIntegration_SyncCreatesSwitch verifies sync.Ensure (real runner) creates
 // a functional opam switch.
 func TestIntegration_SyncCreatesSwitch(t *testing.T) {
 	requireOpam(t)
@@ -53,12 +52,7 @@ func TestIntegration_SyncCreatesSwitch(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 
@@ -94,12 +88,7 @@ func TestIntegration_SwitchPathStoredInLock(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("first sync.Ensure: %v", err)
 	}
 
@@ -107,7 +96,7 @@ func TestIntegration_SwitchPathStoredInLock(t *testing.T) {
 	path1 := lock1.SwitchPath
 
 	// Second sync — lock now has packages; without storing path, hash would differ.
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("second sync.Ensure: %v", err)
 	}
 
@@ -134,12 +123,7 @@ func TestIntegration_BuildHelloWorld(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 
@@ -174,21 +158,12 @@ func TestIntegration_AddDependency(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
 	// Add a small dep with no C deps for speed.
-	cfg.Dependencies["stringext"] = "*"
-	if err := project.SaveConfig(projectDir, cfg); err != nil {
-		t.Fatalf("SaveConfig: %v", err)
-	}
-	if err := opam.Generate(projectDir, cfg); err != nil {
-		t.Fatalf("opam.Generate: %v", err)
+	if err := dune.AddDep(projectDir, "stringext", "*"); err != nil {
+		t.Fatalf("dune.AddDep: %v", err)
 	}
 
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 

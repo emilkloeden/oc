@@ -8,16 +8,12 @@ import (
 	"github.com/emilkloeden/oc/cmd"
 )
 
-// validOcToml returns minimal valid oc.toml content for the given project name.
-func validOcToml(name string) string {
-	return "[project]\nname = \"" + name + "\"\nversion = \"0.1.0\"\n\n[ocaml]\nversion = \"5.2.0\"\n"
-}
-
 func TestRunBuild_CorruptedLock_ReturnsError(t *testing.T) {
 	dir := t.TempDir()
 
-	// Write a valid oc.toml so LoadConfig succeeds.
-	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(validOcToml("myapp")), 0644); err != nil {
+	// Write a valid dune-project so findProjectRoot succeeds.
+	duneProject := "(lang dune 3.0)\n(generate_opam_files true)\n\n(package\n (name myapp)\n (depends\n  (ocaml (>= \"5.2.0\"))\n  dune))\n"
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte(duneProject), 0644); err != nil {
 		t.Fatal(err)
 	}
 

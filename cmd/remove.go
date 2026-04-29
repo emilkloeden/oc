@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 
+	"github.com/emilkloeden/oc/internal/dune"
 	"github.com/emilkloeden/oc/internal/exec"
 	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
@@ -22,27 +23,26 @@ var removeCmd = &cobra.Command{
 	},
 }
 
-// runRemove removes a dependency from the project configuration and uninstalls it via opam.
+// runRemove removes a dependency from the project manifest and uninstalls it via opam.
 func runRemove(dir, pkg string) error {
-	cfg, err := project.LoadConfig(dir)
+	pt, err := project.Detect(dir)
 	if err != nil {
-		return fmt.Errorf("load config: %w", err)
+		return err
 	}
 
-	_, inDeps := cfg.Dependencies[pkg]
-	_, inDev := cfg.DevDependencies[pkg]
-	if !inDeps && !inDev {
-		return fmt.Errorf("%q is not a dependency of this project", pkg)
-	}
-
-	delete(cfg.Dependencies, pkg)
-	delete(cfg.DevDependencies, pkg)
-
-	if err := project.SaveConfig(dir, cfg); err != nil {
-		return fmt.Errorf("save oc.toml: %w", err)
-	}
-	if err := opam.Generate(dir, cfg); err != nil {
-		return fmt.Errorf("regenerate opam file: %w", err)
+	switch pt {
+	case project.TypeDuneManaged:
+		if err := dune.RemoveDep(dir, pkg); err != nil {
+			return fmt.Errorf("remove %s from dune-project: %w", pkg, err)
+		}
+	case project.TypeHandWrittenOpam:
+		path, err := opam.FindOpamFile(dir)
+		if err != nil {
+			return err
+		}
+		if err := opam.RemoveDepFromOpam(path, pkg); err != nil {
+			return fmt.Errorf("remove %s from opam file: %w", pkg, err)
+		}
 	}
 
 	fmt.Printf("Removing %s...\n", pkg)

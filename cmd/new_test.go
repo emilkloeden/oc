@@ -4,6 +4,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/emilkloeden/oc/cmd"
@@ -58,10 +59,71 @@ func TestNew_CreatesExpectedFiles(t *testing.T) {
 	}
 
 	projectDir := filepath.Join(dir, "my_app")
-	for _, f := range []string{"oc.toml", "my_app.opam", "dune-project", "bin/dune", "bin/main.ml", ".gitignore"} {
+	for _, f := range []string{"dune-project", "bin/dune", "bin/main.ml", ".gitignore"} {
 		if _, err := os.Stat(filepath.Join(projectDir, f)); err != nil {
 			t.Errorf("expected %s to exist: %v", f, err)
 		}
+	}
+}
+
+func TestNew_DoesNotCreateOcToml(t *testing.T) {
+	dir := t.TempDir()
+	if err := cmd.RunNew(dir, "my_app", false); err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+
+	ocToml := filepath.Join(dir, "my_app", "oc.toml")
+	if _, err := os.Stat(ocToml); err == nil {
+		t.Error("oc.toml should not be created by oc new")
+	}
+}
+
+func TestNew_DuneProjectHasGenerateOpamFiles(t *testing.T) {
+	dir := t.TempDir()
+	if err := cmd.RunNew(dir, "my_app", false); err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "my_app", "dune-project"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "generate_opam_files") {
+		t.Errorf("dune-project missing (generate_opam_files true):\n%s", content)
+	}
+}
+
+func TestNew_DuneProjectHasPackageStanza(t *testing.T) {
+	dir := t.TempDir()
+	if err := cmd.RunNew(dir, "my_app", false); err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+
+	content, err := os.ReadFile(filepath.Join(dir, "my_app", "dune-project"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(content), "(package") {
+		t.Errorf("dune-project missing (package ...) stanza:\n%s", content)
+	}
+	if !strings.Contains(string(content), "my_app") {
+		t.Errorf("dune-project package stanza missing name my_app:\n%s", content)
+	}
+}
+
+func TestNew_CreatesInitialLockWithOcamlVersion(t *testing.T) {
+	dir := t.TempDir()
+	if err := cmd.RunNew(dir, "my_app", false); err != nil {
+		t.Fatalf("RunNew: %v", err)
+	}
+
+	lockPath := filepath.Join(dir, "my_app", "oc.lock")
+	if _, err := os.Stat(lockPath); err != nil {
+		t.Fatalf("expected oc.lock to exist: %v", err)
+	}
+	content, _ := os.ReadFile(lockPath)
+	if !strings.Contains(string(content), "5.2.0") {
+		t.Errorf("expected oc.lock to contain default OCaml version 5.2.0:\n%s", content)
 	}
 }
 

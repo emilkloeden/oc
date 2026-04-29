@@ -59,9 +59,9 @@ func TestEnvOutput_EmptyPackages(t *testing.T) {
 	}
 }
 
-func TestProjectRoot_FindsOcToml(t *testing.T) {
+func TestProjectRoot_FindsDuneProject(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte("[project]\nname=\"x\"\n[ocaml]\nversion=\"5.2.0\"\n"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte("(lang dune 3.0)\n"), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -69,11 +69,6 @@ func TestProjectRoot_FindsOcToml(t *testing.T) {
 	if err := os.MkdirAll(subdir, 0755); err != nil {
 		t.Fatal(err)
 	}
-
-	if err := os.Chdir(subdir); err != nil {
-		t.Fatal(err)
-	}
-	defer func() { _ = os.Chdir("/") }()
 
 	root, err := cmd.FindProjectRoot(subdir)
 	if err != nil {

@@ -7,9 +7,10 @@ import (
 )
 
 const duneVersion = "3.0"
+const defaultOCamlVersion = "5.2.0"
 
-func ScaffoldBin(dir, name string) error {
-	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name)); err != nil {
+func ScaffoldBin(dir, name, maintainer string) error {
+	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name, maintainer)); err != nil {
 		return fmt.Errorf("write dune-project: %w", err)
 	}
 	binDir := filepath.Join(dir, "bin")
@@ -25,8 +26,8 @@ func ScaffoldBin(dir, name string) error {
 	return nil
 }
 
-func ScaffoldLib(dir, name string) error {
-	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name)); err != nil {
+func ScaffoldLib(dir, name, maintainer string) error {
+	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name, maintainer)); err != nil {
 		return fmt.Errorf("write dune-project: %w", err)
 	}
 	libDir := filepath.Join(dir, "lib")
@@ -42,8 +43,20 @@ func ScaffoldLib(dir, name string) error {
 	return nil
 }
 
-func duneProject(name string) string {
-	return fmt.Sprintf("(lang dune %s)\n(name %s)\n", duneVersion, name)
+func duneProject(name, maintainer string) string {
+	return fmt.Sprintf(`(lang dune %s)
+(generate_opam_files true)
+
+(package
+ (name %s)
+ (synopsis "A new OCaml project")
+ (maintainer %q)
+ (authors %q)
+ (license MIT)
+ (depends
+  (ocaml (>= %q))
+  dune))
+`, duneVersion, name, maintainer, maintainer, defaultOCamlVersion)
 }
 
 func binDune(name string) string {

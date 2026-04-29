@@ -23,12 +23,7 @@ var buildCmd = &cobra.Command{
 
 // runBuild performs the build for the given project directory.
 func runBuild(dir string) error {
-	cfg, err := project.LoadConfig(dir)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	if err := sync.Ensure(dir, cfg); err != nil {
+	if err := sync.Ensure(dir); err != nil {
 		return fmt.Errorf("sync: %w", err)
 	}
 
