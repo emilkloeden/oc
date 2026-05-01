@@ -4,10 +4,11 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/emilkloeden/oc/internal/defaults"
 )
 
 const duneVersion = "3.0"
-const defaultOCamlVersion = "5.2.0"
 
 func ScaffoldBin(dir, name, maintainer string) error {
 	if err := writeIfAbsent(filepath.Join(dir, "dune-project"), duneProject(name, maintainer)); err != nil {
@@ -56,7 +57,7 @@ func duneProject(name, maintainer string) string {
  (depends
   (ocaml (>= %q))
   dune))
-`, duneVersion, name, maintainer, maintainer, defaultOCamlVersion)
+`, duneVersion, name, maintainer, maintainer, defaults.DefaultOCamlVersion)
 }
 
 func binDune(name string) string {
