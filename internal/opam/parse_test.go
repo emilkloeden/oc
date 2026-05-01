@@ -186,6 +186,53 @@ func TestReadOCamlVersion_MissingOpamFile(t *testing.T) {
 	}
 }
 
+func TestAddDepToOpam_NestedBracketsInDependsBlock(t *testing.T) {
+	// opam's depends: block can contain nested [...] (alternatives/conjunctions).
+	// The naive strings.Index(content[start:], "]") finds the first "]" which is
+	// inside the nested block, causing the outer block bounds to be wrong.
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+name: "my_app"
+depends: [
+  [ "pkg1" | "pkg2" ]
+  "dune" {>= "3.0"}
+]
+`
+	path := writeOpam(t, dir, "my_app", content)
+	if err := opam.AddDepToOpam(path, "yojson", "*"); err != nil {
+		t.Fatalf("AddDepToOpam: %v", err)
+	}
+
+	result, _ := os.ReadFile(path)
+	if !strings.Contains(string(result), `"yojson"`) {
+		t.Errorf("expected yojson to be added:\n%s", result)
+	}
+	// Verify the nested alternatives block was not corrupted.
+	if !strings.Contains(string(result), `[ "pkg1" | "pkg2" ]`) {
+		t.Errorf("nested alternatives block corrupted:\n%s", result)
+	}
+}
+
+func TestReadOCamlVersion_NestedBracketsBeforeOcaml(t *testing.T) {
+	// Nested [ ] before the ocaml entry — naive search finds the inner ] first.
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+depends: [
+  [ "pkg1" | "pkg2" ]
+  "ocaml" {>= "5.2.0"}
+  "dune" {>= "3.0"}
+]
+`
+	writeOpam(t, dir, "my_app", content)
+	v, err := opam.ReadOCamlVersion(dir)
+	if err != nil {
+		t.Fatalf("ReadOCamlVersion: %v", err)
+	}
+	if v != "5.2.0" {
+		t.Errorf("got %q, want %q", v, "5.2.0")
+	}
+}
+
 func TestAddDepToOpam_NoTempFilesLeft(t *testing.T) {
 	dir := t.TempDir()
 	path := writeOpam(t, dir, "my_app", sampleOpam)
