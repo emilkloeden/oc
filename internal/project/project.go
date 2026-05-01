@@ -1,12 +1,14 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/emilkloeden/oc/internal/atomicfile"
 )
 
 const stateDir = ".oc"
@@ -41,22 +43,11 @@ func SaveState(dir string, s State) error {
 	if err := os.MkdirAll(ocDir, 0755); err != nil {
 		return err
 	}
-	path := filepath.Join(ocDir, stateFile)
-	tmp, err := os.CreateTemp(ocDir, ".state.*.tmp")
-	if err != nil {
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).Encode(s); err != nil {
 		return err
 	}
-	tmpPath := tmp.Name()
-	if err := toml.NewEncoder(tmp).Encode(s); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	return os.Rename(tmpPath, path)
+	return atomicfile.Write(filepath.Join(ocDir, stateFile), buf.Bytes(), 0644)
 }
 
 // Dep represents a package name and its version constraint as parsed from CLI arguments.

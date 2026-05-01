@@ -93,6 +93,29 @@ func TestSaveState_ConcurrentWritesProduceValidFile(t *testing.T) {
 	}
 }
 
+func TestSaveState_CleansTempFileOnRenameFailure(t *testing.T) {
+	// Force os.Rename to fail by making the destination path a directory.
+	// CreateTemp still succeeds (it uses .oc/ as its dir), but Rename to
+	// state.toml/ (a directory) fails with EISDIR.
+	dir := t.TempDir()
+	ocDir := filepath.Join(dir, ".oc")
+	if err := os.MkdirAll(filepath.Join(ocDir, "state.toml"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"})
+	if err == nil {
+		t.Fatal("expected error when rename target is a directory, got nil")
+	}
+
+	entries, _ := os.ReadDir(ocDir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind after rename failure: %s", e.Name())
+		}
+	}
+}
+
 func TestParseConstraintParts_GEOperator(t *testing.T) {
 	op, ver := project.ParseConstraintParts(">=5.2.0")
 	if op != ">=" || ver != "5.2.0" {
