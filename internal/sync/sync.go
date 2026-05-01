@@ -3,6 +3,8 @@ package sync
 import (
 	"fmt"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/emilkloeden/oc/internal/defaults"
 	"github.com/emilkloeden/oc/internal/exec"
@@ -16,6 +18,9 @@ type OpamRunner interface {
 	CreateSwitch(path, ocamlVersion string) error
 	InstallDeps(dir, switchPath string) error
 	LockDeps(dir string) error
+	CloneSwitch(source, dest string) error
+	GetSwitchOCamlVersion(switchPath string) (string, error)
+	ListCachedSwitches() ([]string, error)
 }
 
 type realRunner struct{}
@@ -44,6 +49,58 @@ func (r *realRunner) InstallDeps(dir, switchPath string) error {
 
 func (r *realRunner) LockDeps(dir string) error {
 	return exec.Run("opam", []string{"lock", "."}, exec.Options{Dir: dir})
+}
+
+func (r *realRunner) CloneSwitch(source, dest string) error {
+	fmt.Printf("Cloning existing switch as base (this may take a moment)...\n")
+	if err := os.MkdirAll(filepath.Dir(dest), 0755); err != nil {
+		return fmt.Errorf("create switches dir: %w", err)
+	}
+	return exec.Run("opam", []string{
+		"switch", "copy", source, dest,
+	}, exec.Options{})
+}
+
+func (r *realRunner) GetSwitchOCamlVersion(switchPath string) (string, error) {
+	out, err := exec.Output("opam", []string{
+		"list", "ocaml", "--installed", "--short", "--columns=version",
+		"--switch", switchPath,
+	}, exec.Options{})
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(out), nil
+}
+
+func (r *realRunner) ListCachedSwitches() ([]string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return nil, fmt.Errorf("determine home directory: %w", err)
+	}
+	return swmgr.ListCachedSwitches(filepath.Join(home, ".cache", "oc", "switches"))
+}
+
+// findBestBase returns the path of the best existing switch to clone from for
+// targetVersion. It picks the first compatible switch (same OCaml version) that
+// is not the target path itself. Returns "" when no suitable base exists.
+func findBestBase(targetPath, ocamlVersion string, runner OpamRunner) string {
+	candidates, err := runner.ListCachedSwitches()
+	if err != nil || len(candidates) == 0 {
+		return ""
+	}
+	for _, p := range candidates {
+		if p == targetPath || !runner.SwitchExists(p) {
+			continue
+		}
+		v, err := runner.GetSwitchOCamlVersion(p)
+		if err != nil {
+			continue
+		}
+		if v == ocamlVersion {
+			return p
+		}
+	}
+	return ""
 }
 
 // Ensure is the public entry point using the real opam runner.
@@ -75,15 +132,26 @@ func EnsureWith(dir string, ocamlVersion string, runner OpamRunner) error {
 	switchPath := state.SwitchPath
 	if switchPath == "" || !runner.SwitchExists(switchPath) {
 		var err error
-		switchPath, err = swmgr.CachePathForVersion(ocamlVersion)
+		switchPath, err = swmgr.CachePathForProject(dir, ocamlVersion)
 		if err != nil {
 			return fmt.Errorf("compute switch path: %w", err)
 		}
 	}
 
 	if !runner.SwitchExists(switchPath) {
-		if err := runner.CreateSwitch(switchPath, ocamlVersion); err != nil {
-			return fmt.Errorf("create switch: %w", err)
+		base := findBestBase(switchPath, ocamlVersion, runner)
+		if base != "" {
+			if err := runner.CloneSwitch(base, switchPath); err != nil {
+				// Clone failed — fall back to a clean create.
+				fmt.Fprintf(os.Stderr, "warning: switch clone failed, creating from scratch: %v\n", err)
+				if err2 := runner.CreateSwitch(switchPath, ocamlVersion); err2 != nil {
+					return fmt.Errorf("create switch: %w", err2)
+				}
+			}
+		} else {
+			if err := runner.CreateSwitch(switchPath, ocamlVersion); err != nil {
+				return fmt.Errorf("create switch: %w", err)
+			}
 		}
 	}
 
