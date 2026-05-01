@@ -186,6 +186,38 @@ func TestReadOCamlVersion_MissingOpamFile(t *testing.T) {
 	}
 }
 
+func TestAddDepToOpam_NoTempFilesLeft(t *testing.T) {
+	dir := t.TempDir()
+	path := writeOpam(t, dir, "my_app", sampleOpam)
+
+	if err := opam.AddDepToOpam(path, "yojson", "*"); err != nil {
+		t.Fatalf("AddDepToOpam: %v", err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind: %s", e.Name())
+		}
+	}
+}
+
+func TestRemoveDepFromOpam_NoTempFilesLeft(t *testing.T) {
+	dir := t.TempDir()
+	path := writeOpam(t, dir, "my_app", sampleOpamWithDep)
+
+	if err := opam.RemoveDepFromOpam(path, "yojson"); err != nil {
+		t.Fatalf("RemoveDepFromOpam: %v", err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind: %s", e.Name())
+		}
+	}
+}
+
 func TestAddDepToOpam_InsertsInsideDependsBlockNotAtFileStart(t *testing.T) {
 	// Ensures insertion uses the correct block bounds (end position),
 	// not position 0 (which would prepend before the file header).

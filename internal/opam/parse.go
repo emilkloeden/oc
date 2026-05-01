@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/emilkloeden/oc/internal/atomicfile"
 	"github.com/emilkloeden/oc/internal/project"
 )
 
@@ -53,7 +54,7 @@ func AddDepToOpam(path, pkg, constraint string) error {
 	}
 
 	newContent := content[:end] + "  " + entry + "\n" + content[end:]
-	return os.WriteFile(path, []byte(newContent), 0644)
+	return atomicfile.Write(path, []byte(newContent), 0644)
 }
 
 // RemoveDepFromOpam removes a dependency from the depends: block in an opam file.
@@ -78,7 +79,7 @@ func RemoveDepFromOpam(path, pkg string) error {
 		}
 		result = append(result, line)
 	}
-	return os.WriteFile(path, []byte(strings.Join(result, "\n")), 0644)
+	return atomicfile.Write(path, []byte(strings.Join(result, "\n")), 0644)
 }
 
 // findOpamDepsBounds finds the start and end positions of the depends: block.

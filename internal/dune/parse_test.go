@@ -245,6 +245,39 @@ func TestHasGenerateOpamFiles_FalseWhenAbsent(t *testing.T) {
 	}
 }
 
+func TestAddDep_NoTempFilesLeft(t *testing.T) {
+	dir := t.TempDir()
+	writeDuneProject(t, dir, sampleDuneProject)
+
+	if err := dune.AddDep(dir, "yojson", "*"); err != nil {
+		t.Fatalf("AddDep: %v", err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind in project dir: %s", e.Name())
+		}
+	}
+}
+
+func TestRemoveDep_NoTempFilesLeft(t *testing.T) {
+	dir := t.TempDir()
+	content := "(lang dune 3.0)\n(generate_opam_files true)\n\n(package\n (name my_app)\n (depends\n  dune\n  yojson))\n"
+	writeDuneProject(t, dir, content)
+
+	if err := dune.RemoveDep(dir, "yojson"); err != nil {
+		t.Fatalf("RemoveDep: %v", err)
+	}
+
+	entries, _ := os.ReadDir(dir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind in project dir: %s", e.Name())
+		}
+	}
+}
+
 func writeDuneProjectBytes(t *testing.T, dir string, content []byte) {
 	t.Helper()
 	if err := os.WriteFile(filepath.Join(dir, "dune-project"), content, 0644); err != nil {
