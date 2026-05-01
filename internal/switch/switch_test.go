@@ -7,70 +7,53 @@ import (
 	"testing"
 
 	sw "github.com/emilkloeden/oc/internal/switch"
-	"github.com/emilkloeden/oc/internal/project"
 )
 
-func lock(ocamlVer string, pkgs ...project.Package) *project.Lock {
-	return &project.Lock{
-		OCaml:    project.OCamlMeta{Version: ocamlVer},
-		Packages: pkgs,
+func TestCachePathForVersion_Deterministic(t *testing.T) {
+	p1, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	p2, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	if p1 != p2 {
+		t.Errorf("CachePathForVersion not deterministic: %q vs %q", p1, p2)
 	}
 }
 
-func TestHash_DeterministicSameInputs(t *testing.T) {
-	l := lock("5.2.0",
-		project.Package{Name: "cohttp", Version: "5.0.0"},
-		project.Package{Name: "lwt", Version: "5.7.0"},
-	)
-	h1 := sw.Hash(l)
-	h2 := sw.Hash(l)
-	if h1 != h2 {
-		t.Errorf("hash not deterministic: %q vs %q", h1, h2)
+func TestCachePathForVersion_DiffersForDifferentVersions(t *testing.T) {
+	p1, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	p2, err := sw.CachePathForVersion("5.3.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	if p1 == p2 {
+		t.Error("different OCaml versions should produce different cache paths")
 	}
 }
 
-func TestHash_DifferentOCamlVersion(t *testing.T) {
-	l1 := lock("5.2.0", project.Package{Name: "cohttp", Version: "5.0.0"})
-	l2 := lock("5.1.0", project.Package{Name: "cohttp", Version: "5.0.0"})
-	if sw.Hash(l1) == sw.Hash(l2) {
-		t.Error("different ocaml versions should produce different hashes")
+func TestCachePathForVersion_ContainsExpectedSegments(t *testing.T) {
+	path, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
 	}
-}
-
-func TestHash_DifferentPackages(t *testing.T) {
-	l1 := lock("5.2.0", project.Package{Name: "cohttp", Version: "5.0.0"})
-	l2 := lock("5.2.0", project.Package{Name: "cohttp", Version: "5.1.0"})
-	if sw.Hash(l1) == sw.Hash(l2) {
-		t.Error("different package versions should produce different hashes")
+	if !strings.Contains(path, filepath.Join(".cache", "oc", "switches")) {
+		t.Errorf("unexpected path structure: %q", path)
 	}
-}
-
-func TestHash_OrderIndependent(t *testing.T) {
-	l1 := lock("5.2.0",
-		project.Package{Name: "cohttp", Version: "5.0.0"},
-		project.Package{Name: "lwt", Version: "5.7.0"},
-	)
-	l2 := lock("5.2.0",
-		project.Package{Name: "lwt", Version: "5.7.0"},
-		project.Package{Name: "cohttp", Version: "5.0.0"},
-	)
-	if sw.Hash(l1) != sw.Hash(l2) {
-		t.Error("package order should not affect hash")
-	}
-}
-
-func TestCachePath_ContainsHash(t *testing.T) {
-	l := lock("5.2.0", project.Package{Name: "cohttp", Version: "5.0.0"})
-	h := sw.Hash(l)
-	path := sw.CachePath(l)
-	if filepath.Base(path) != h {
-		t.Errorf("CachePath base should be hash %q, got %q", h, filepath.Base(path))
+	base := filepath.Base(path)
+	if len(base) != 16 {
+		t.Errorf("expected 16-char hash in path base, got %q (len %d)", base, len(base))
 	}
 }
 
 func TestEnsureSymlink_CreatesLink(t *testing.T) {
 	projectDir := t.TempDir()
-	target := t.TempDir() // simulates a switch directory that already exists
+	target := t.TempDir()
 
 	if err := sw.EnsureSymlink(projectDir, target); err != nil {
 		t.Fatalf("EnsureSymlink: %v", err)
@@ -98,7 +81,6 @@ func TestEnsureSymlink_UpdatesStaleLink(t *testing.T) {
 	old := t.TempDir()
 	newTarget := t.TempDir()
 
-	// create initial symlink
 	if err := os.Symlink(old, filepath.Join(projectDir, ".ocaml")); err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +98,6 @@ func TestEnsureSymlink_UpdatesStaleLink(t *testing.T) {
 func TestEnsureSymlink_RegularFileReturnsError(t *testing.T) {
 	projectDir := t.TempDir()
 	link := filepath.Join(projectDir, ".ocaml")
-	// Create a regular file (not a symlink) at .ocaml
 	if err := os.WriteFile(link, []byte("not a symlink"), 0644); err != nil {
 		t.Fatal(err)
 	}
@@ -126,14 +107,13 @@ func TestEnsureSymlink_RegularFileReturnsError(t *testing.T) {
 		t.Fatal("expected error when .ocaml is a regular file, got nil")
 	}
 	if !strings.Contains(err.Error(), "remove it manually") {
-		t.Errorf("error should mention 'remove it manually' to guide the user; got: %v", err)
+		t.Errorf("error should mention 'remove it manually'; got: %v", err)
 	}
 }
 
 func TestEnsureSymlink_DirectoryReturnsError(t *testing.T) {
 	projectDir := t.TempDir()
 	link := filepath.Join(projectDir, ".ocaml")
-	// Create a directory at .ocaml
 	if err := os.MkdirAll(link, 0755); err != nil {
 		t.Fatal(err)
 	}
@@ -143,6 +123,6 @@ func TestEnsureSymlink_DirectoryReturnsError(t *testing.T) {
 		t.Fatal("expected error when .ocaml is a directory, got nil")
 	}
 	if !strings.Contains(err.Error(), "remove it manually") {
-		t.Errorf("error should mention 'remove it manually' to guide the user; got: %v", err)
+		t.Errorf("error should mention 'remove it manually'; got: %v", err)
 	}
 }

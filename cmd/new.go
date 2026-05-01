@@ -9,7 +9,6 @@ import (
 
 	"github.com/emilkloeden/oc/internal/dune"
 	"github.com/emilkloeden/oc/internal/exec"
-	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -55,39 +54,24 @@ func RunNew(parent, name string, lib bool) error {
 	}()
 
 	maintainer := gitMaintainer()
-	authors := []string{"Your Name <you@example.com>"}
-	if maintainer != "" {
-		authors = []string{maintainer}
-	}
-
-	cfg := &project.Config{
-		Project: project.ProjectMeta{
-			Name:       name,
-			Version:    "0.1.0",
-			Maintainer: maintainer,
-			Authors:    authors,
-			License:    "MIT",
-		},
-		OCaml:           project.OCamlMeta{Version: "5.2.0"},
-		Dependencies:    map[string]string{},
-		DevDependencies: map[string]string{},
-	}
-
-	if err := project.SaveConfig(dir, cfg); err != nil {
-		return fmt.Errorf("write oc.toml: %w", err)
-	}
-	if err := opam.Generate(dir, cfg); err != nil {
-		return fmt.Errorf("generate opam file: %w", err)
+	if maintainer == "" {
+		maintainer = "Your Name <you@example.com>"
 	}
 
 	if lib {
-		if err := dune.ScaffoldLib(dir, name); err != nil {
+		if err := dune.ScaffoldLib(dir, name, maintainer); err != nil {
 			return fmt.Errorf("scaffold lib: %w", err)
 		}
 	} else {
-		if err := dune.ScaffoldBin(dir, name); err != nil {
+		if err := dune.ScaffoldBin(dir, name, maintainer); err != nil {
 			return fmt.Errorf("scaffold bin: %w", err)
 		}
+	}
+
+	// Write initial .oc/state.toml so subsequent commands know the OCaml version.
+	state := project.State{OCamlVersion: "5.2.0"}
+	if err := project.SaveState(dir, state); err != nil {
+		return fmt.Errorf("write .oc/state.toml: %w", err)
 	}
 
 	if err := writeGitignore(dir); err != nil {
@@ -101,7 +85,7 @@ func RunNew(parent, name string, lib bool) error {
 }
 
 func writeGitignore(dir string) error {
-	content := ".ocaml/\n_build/\n*.install\n"
+	content := ".ocaml/\n.oc/\n_build/\n*.install\n"
 	return os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(content), 0644)
 }
 

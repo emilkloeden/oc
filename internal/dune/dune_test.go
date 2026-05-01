@@ -11,7 +11,7 @@ import (
 
 func TestScaffoldBin_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatalf("ScaffoldBin: %v", err)
 	}
 
@@ -24,7 +24,7 @@ func TestScaffoldBin_CreatesFiles(t *testing.T) {
 
 func TestScaffoldBin_DuneProject(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -39,7 +39,7 @@ func TestScaffoldBin_DuneProject(t *testing.T) {
 
 func TestScaffoldBin_BinDune(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -54,7 +54,7 @@ func TestScaffoldBin_BinDune(t *testing.T) {
 
 func TestScaffoldBin_MainML(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -66,7 +66,7 @@ func TestScaffoldBin_MainML(t *testing.T) {
 
 func TestScaffoldLib_CreatesFiles(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldLib(dir, "my_lib"); err != nil {
+	if err := dune.ScaffoldLib(dir, "my_lib", "Test User <test@example.com>"); err != nil {
 		t.Fatalf("ScaffoldLib: %v", err)
 	}
 
@@ -79,7 +79,7 @@ func TestScaffoldLib_CreatesFiles(t *testing.T) {
 
 func TestScaffoldLib_LibDune(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldLib(dir, "my_lib"); err != nil {
+	if err := dune.ScaffoldLib(dir, "my_lib", "Test User <test@example.com>"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -94,11 +94,11 @@ func TestScaffoldLib_LibDune(t *testing.T) {
 
 func TestScaffoldBin_IdempotentDuneProject(t *testing.T) {
 	dir := t.TempDir()
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatal(err)
 	}
 	// calling again should not error
-	if err := dune.ScaffoldBin(dir, "my_app"); err != nil {
+	if err := dune.ScaffoldBin(dir, "my_app", "Test User <test@example.com>"); err != nil {
 		t.Fatalf("second ScaffoldBin should be idempotent: %v", err)
 	}
 }

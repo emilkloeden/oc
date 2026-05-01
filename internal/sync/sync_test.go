@@ -11,12 +11,12 @@ import (
 )
 
 type mockRunner struct {
-	switches        map[string]bool
-	createCalled    []string
-	installCalled   []string
-	installedPkgs   []project.Package
-	createErr       error
-	installErr      error
+	switches      map[string]bool
+	createCalled  []string
+	installCalled []string
+	lockCalled    []string
+	createErr     error
+	installErr    error
 }
 
 func (m *mockRunner) SwitchExists(path string) bool {
@@ -34,24 +34,16 @@ func (m *mockRunner) InstallDeps(dir, switchPath string) error {
 	return m.installErr
 }
 
-func (m *mockRunner) ListInstalled(switchPath string) ([]project.Package, error) {
-	return m.installedPkgs, nil
-}
-
-func cfg(ocamlVer string) *project.Config {
-	return &project.Config{
-		Project:         project.ProjectMeta{Name: "test_app", Version: "0.1.0"},
-		OCaml:           project.OCamlMeta{Version: ocamlVer},
-		Dependencies:    map[string]string{},
-		DevDependencies: map[string]string{},
-	}
+func (m *mockRunner) LockDeps(dir string) error {
+	m.lockCalled = append(m.lockCalled, dir)
+	return nil
 }
 
 func TestEnsureWith_CreatesSwitch_WhenMissing(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -65,11 +57,11 @@ func TestEnsureWith_SkipsCreate_WhenSwitchExists(t *testing.T) {
 	runner := &mockRunner{switches: map[string]bool{}}
 
 	// first call creates
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	// second call should reuse
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("second EnsureWith: %v", err)
 	}
 
@@ -82,7 +74,7 @@ func TestEnsureWith_CreatesSymlink(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -100,7 +92,7 @@ func TestEnsureWith_CallsInstallDeps(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
@@ -109,73 +101,56 @@ func TestEnsureWith_CallsInstallDeps(t *testing.T) {
 	}
 }
 
-func TestEnsureWith_UpdatesLockfile(t *testing.T) {
-	dir := t.TempDir()
-	runner := &mockRunner{
-		switches: map[string]bool{},
-		installedPkgs: []project.Package{
-			{Name: "cohttp", Version: "5.0.0"},
-			{Name: "lwt", Version: "5.7.0"},
-		},
-	}
-
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
-		t.Fatalf("EnsureWith: %v", err)
-	}
-
-	lock, err := project.LoadLock(dir)
-	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
-	}
-	if len(lock.Packages) != 2 {
-		t.Errorf("expected 2 packages in lockfile, got %d", len(lock.Packages))
-	}
-	if lock.OCaml.Version != "5.2.0" {
-		t.Errorf("ocaml version in lock: got %q", lock.OCaml.Version)
-	}
-}
-
-func TestEnsureWith_StoresSwitchPathInLock(t *testing.T) {
+func TestEnsureWith_CallsLockDeps(t *testing.T) {
 	dir := t.TempDir()
 	runner := &mockRunner{switches: map[string]bool{}}
 
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatalf("EnsureWith: %v", err)
 	}
 
-	lock, err := project.LoadLock(dir)
-	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+	if len(runner.lockCalled) != 1 {
+		t.Errorf("expected LockDeps called once, got %d", len(runner.lockCalled))
 	}
-	if lock.SwitchPath == "" {
-		t.Error("expected SwitchPath to be stored in lockfile")
+}
+
+func TestEnsureWith_SavesState(t *testing.T) {
+	dir := t.TempDir()
+	runner := &mockRunner{switches: map[string]bool{}}
+
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
+		t.Fatalf("EnsureWith: %v", err)
+	}
+
+	s, err := project.LoadState(dir)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if s.SwitchPath == "" {
+		t.Error("expected SwitchPath to be saved in state")
+	}
+	if s.OCamlVersion != "5.2.0" {
+		t.Errorf("OCamlVersion in state: got %q, want %q", s.OCamlVersion, "5.2.0")
 	}
 }
 
 func TestEnsureWith_ReusesSwitchPathAcrossCalls(t *testing.T) {
 	dir := t.TempDir()
-	runner := &mockRunner{
-		switches: map[string]bool{},
-		installedPkgs: []project.Package{
-			{Name: "cohttp", Version: "5.0.0"},
-		},
-	}
+	runner := &mockRunner{switches: map[string]bool{}}
 
-	// First call: switch created, lock written with packages + switch path
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	// First call: switch created, state written with switch path
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
+	s1, _ := project.LoadState(dir)
+	path1 := s1.SwitchPath
 
-	lock1, _ := project.LoadLock(dir)
-	path1 := lock1.SwitchPath
-
-	// Second call: packages now in lock → hash would differ without stored path
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	// Second call: should reuse stored path, not recompute
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
-
-	lock2, _ := project.LoadLock(dir)
-	path2 := lock2.SwitchPath
+	s2, _ := project.LoadState(dir)
+	path2 := s2.SwitchPath
 
 	if path1 != path2 {
 		t.Errorf("switch path changed between calls: %q → %q", path1, path2)
@@ -192,7 +167,7 @@ func TestEnsureWith_PropagatesCreateError(t *testing.T) {
 		createErr: fmt.Errorf("opam failed"),
 	}
 
-	err := sync.EnsureWith(dir, cfg("5.2.0"), runner)
+	err := sync.EnsureWith(dir, "5.2.0", runner)
 	if err == nil {
 		t.Fatal("expected error when CreateSwitch fails")
 	}
@@ -203,7 +178,7 @@ func TestEnsureWith_NewSwitchOnOCamlVersionChange(t *testing.T) {
 	runner := &mockRunner{switches: map[string]bool{}}
 
 	// First call with 5.2.0
-	if err := sync.EnsureWith(dir, cfg("5.2.0"), runner); err != nil {
+	if err := sync.EnsureWith(dir, "5.2.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	if len(runner.createCalled) != 1 {
@@ -211,8 +186,8 @@ func TestEnsureWith_NewSwitchOnOCamlVersionChange(t *testing.T) {
 	}
 	path1 := runner.createCalled[0]
 
-	// Second call with a different OCaml version
-	if err := sync.EnsureWith(dir, cfg("5.3.0"), runner); err != nil {
+	// Second call with a different OCaml version — stored path must be discarded
+	if err := sync.EnsureWith(dir, "5.3.0", runner); err != nil {
 		t.Fatal(err)
 	}
 	if len(runner.createCalled) != 2 {

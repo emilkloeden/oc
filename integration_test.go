@@ -3,6 +3,7 @@
 package main_test
 
 import (
+	"bytes"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -10,7 +11,8 @@ import (
 	"testing"
 
 	"github.com/emilkloeden/oc/cmd"
-	"github.com/emilkloeden/oc/internal/opam"
+	"github.com/emilkloeden/oc/internal/dune"
+	ocExec "github.com/emilkloeden/oc/internal/exec"
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/emilkloeden/oc/internal/sync"
 )
@@ -23,7 +25,7 @@ func requireOpam(t *testing.T) {
 }
 
 // TestIntegration_NewCreatesValidProject verifies oc new produces a project
-// that opam and dune can understand.
+// that opam and dune can understand (via dune generating the .opam file).
 func TestIntegration_NewCreatesValidProject(t *testing.T) {
 	requireOpam(t)
 
@@ -34,14 +36,13 @@ func TestIntegration_NewCreatesValidProject(t *testing.T) {
 
 	projectDir := filepath.Join(dir, "hello")
 
-	// opam lint should accept the generated .opam file
-	out, err := runCmd(projectDir, "opam", "lint", "hello.opam")
-	if err != nil {
-		t.Fatalf("opam lint failed: %v\noutput: %s", err, out)
+	// dune-project should have generate_opam_files
+	if !dune.HasGenerateOpamFiles(projectDir) {
+		t.Error("dune-project missing (generate_opam_files true)")
 	}
 }
 
-// TestIntegration_SyncCreatesSwitch verifies EnsureWith (real runner) creates
+// TestIntegration_SyncCreatesSwitch verifies sync.Ensure (real runner) creates
 // a functional opam switch.
 func TestIntegration_SyncCreatesSwitch(t *testing.T) {
 	requireOpam(t)
@@ -53,12 +54,7 @@ func TestIntegration_SyncCreatesSwitch(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 
@@ -72,21 +68,21 @@ func TestIntegration_SyncCreatesSwitch(t *testing.T) {
 		t.Error(".ocaml should be a symlink")
 	}
 
-	// lockfile must be written
-	lock, err := project.LoadLock(projectDir)
+	// State must be written with a switch path
+	state, err := project.LoadState(projectDir)
 	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+		t.Fatalf("LoadState: %v", err)
 	}
-	if lock.OCaml.Version == "" {
-		t.Error("lockfile missing OCaml version")
+	if state.SwitchPath == "" {
+		t.Error("state missing SwitchPath after sync")
 	}
 }
 
-// TestIntegration_SwitchPathStoredInLock verifies that after sync the switch
-// path is persisted in oc.lock so subsequent calls stay on the same switch.
-func TestIntegration_SwitchPathStoredInLock(t *testing.T) {
+// TestIntegration_SwitchPathStoredInState verifies that after sync the switch
+// path is persisted in .oc/state.toml so subsequent calls stay on the same switch.
+func TestIntegration_SwitchPathStoredInState(t *testing.T) {
 	requireOpam(t)
-	t.Log("Creating a switch to verify lock persistence — may take several minutes on first run.")
+	t.Log("Creating a switch to verify state persistence — may take several minutes on first run.")
 
 	dir := t.TempDir()
 	if err := cmd.RunNew(dir, "hello", false); err != nil {
@@ -94,25 +90,20 @@ func TestIntegration_SwitchPathStoredInLock(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("first sync.Ensure: %v", err)
 	}
 
-	lock1, _ := project.LoadLock(projectDir)
-	path1 := lock1.SwitchPath
+	s1, _ := project.LoadState(projectDir)
+	path1 := s1.SwitchPath
 
-	// Second sync — lock now has packages; without storing path, hash would differ.
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	// Second sync — should reuse stored path.
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("second sync.Ensure: %v", err)
 	}
 
-	lock2, _ := project.LoadLock(projectDir)
-	path2 := lock2.SwitchPath
+	s2, _ := project.LoadState(projectDir)
+	path2 := s2.SwitchPath
 
 	if path1 == "" {
 		t.Fatal("SwitchPath not stored after first sync")
@@ -134,25 +125,19 @@ func TestIntegration_BuildHelloWorld(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 
-	lock, err := project.LoadLock(projectDir)
+	state, err := project.LoadState(projectDir)
 	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+		t.Fatalf("LoadState: %v", err)
 	}
-	switchPath := lock.SwitchPath
-	if switchPath == "" {
-		t.Fatal("lock.SwitchPath empty after sync")
+	if state.SwitchPath == "" {
+		t.Fatal("state.SwitchPath empty after sync")
 	}
 
-	out, err := runCmd(projectDir, "opam", "exec", "--switch", switchPath, "--", "dune", "build")
+	out, err := runCmd(projectDir, "opam", "exec", "--switch", state.SwitchPath, "--", "dune", "build")
 	if err != nil {
 		t.Fatalf("dune build failed: %v\noutput: %s", err, out)
 	}
@@ -163,7 +148,8 @@ func TestIntegration_BuildHelloWorld(t *testing.T) {
 	}
 }
 
-// TestIntegration_AddDependency verifies oc add updates the lockfile.
+// TestIntegration_AddDependency verifies oc add installs a package and the
+// switch has it available after sync.
 func TestIntegration_AddDependency(t *testing.T) {
 	requireOpam(t)
 	t.Log("This test installs an opam package — may take several minutes.")
@@ -174,38 +160,30 @@ func TestIntegration_AddDependency(t *testing.T) {
 	}
 	projectDir := filepath.Join(dir, "hello")
 
-	cfg, err := project.LoadConfig(projectDir)
-	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
+	// Add a small dep with no C dependencies for speed.
+	if err := dune.AddDep(projectDir, "stringext", "*"); err != nil {
+		t.Fatalf("dune.AddDep: %v", err)
 	}
 
-	// Add a small dep with no C deps for speed.
-	cfg.Dependencies["stringext"] = "*"
-	if err := project.SaveConfig(projectDir, cfg); err != nil {
-		t.Fatalf("SaveConfig: %v", err)
-	}
-	if err := opam.Generate(projectDir, cfg); err != nil {
-		t.Fatalf("opam.Generate: %v", err)
-	}
-
-	if err := sync.Ensure(projectDir, cfg); err != nil {
+	if err := sync.Ensure(projectDir); err != nil {
 		t.Fatalf("sync.Ensure: %v", err)
 	}
 
-	lock, err := project.LoadLock(projectDir)
+	state, err := project.LoadState(projectDir)
 	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+		t.Fatalf("LoadState: %v", err)
 	}
 
-	found := false
-	for _, p := range lock.Packages {
-		if strings.EqualFold(p.Name, "stringext") {
-			found = true
-			break
-		}
+	// Verify stringext is installed in the switch.
+	var buf bytes.Buffer
+	if err := ocExec.Run("opam", []string{
+		"list", "--installed", "--short", "--columns=name",
+		"--switch", state.SwitchPath,
+	}, ocExec.Options{Stdout: &buf}); err != nil {
+		t.Fatalf("opam list: %v", err)
 	}
-	if !found {
-		t.Errorf("stringext not found in lockfile packages: %v", lock.Packages)
+	if !strings.Contains(buf.String(), "stringext") {
+		t.Errorf("stringext not installed in switch; opam list output:\n%s", buf.String())
 	}
 }
 

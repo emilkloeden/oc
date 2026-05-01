@@ -5,232 +5,151 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
+	gosync "sync"
 	"testing"
 
 	"github.com/emilkloeden/oc/internal/project"
 )
 
-func TestLoadConfig_Basic(t *testing.T) {
-	dir := t.TempDir()
-	content := `
-[project]
-name = "my_app"
-version = "0.1.0"
-
-[ocaml]
-version = "5.2.0"
-
-[dependencies]
-cohttp = ">=5.0.0"
-
-[dev-dependencies]
-alcotest = "*"
-`
-	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	cfg, err := project.LoadConfig(dir)
+func TestLoadState_Missing(t *testing.T) {
+	s, err := project.LoadState(t.TempDir())
 	if err != nil {
-		t.Fatalf("LoadConfig: %v", err)
+		t.Fatalf("LoadState missing file should return empty State, got error: %v", err)
 	}
-
-	if cfg.Project.Name != "my_app" {
-		t.Errorf("name: got %q want %q", cfg.Project.Name, "my_app")
+	if s.SwitchPath != "" {
+		t.Errorf("expected empty SwitchPath, got %q", s.SwitchPath)
 	}
-	if cfg.Project.Version != "0.1.0" {
-		t.Errorf("version: got %q want %q", cfg.Project.Version, "0.1.0")
-	}
-	if cfg.OCaml.Version != "5.2.0" {
-		t.Errorf("ocaml version: got %q want %q", cfg.OCaml.Version, "5.2.0")
-	}
-	if v, ok := cfg.Dependencies["cohttp"]; !ok || v != ">=5.0.0" {
-		t.Errorf("dependencies: got %v", cfg.Dependencies)
-	}
-	if v, ok := cfg.DevDependencies["alcotest"]; !ok || v != "*" {
-		t.Errorf("dev-dependencies: got %v", cfg.DevDependencies)
+	if s.OCamlVersion != "" {
+		t.Errorf("expected empty OCamlVersion, got %q", s.OCamlVersion)
 	}
 }
 
-func TestLoadConfig_MissingFile(t *testing.T) {
-	_, err := project.LoadConfig(t.TempDir())
-	if err == nil {
-		t.Fatal("expected error for missing oc.toml")
-	}
-}
-
-func TestLoadConfig_MissingName(t *testing.T) {
+func TestSaveState_RoundTrip(t *testing.T) {
 	dir := t.TempDir()
-	content := `
-[project]
-version = "0.1.0"
-[ocaml]
-version = "5.2.0"
-`
-	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
+	s := project.State{
+		SwitchPath:   "/cache/oc/switches/abc123/",
+		OCamlVersion: "5.2.0",
 	}
-	_, err := project.LoadConfig(dir)
-	if err == nil {
-		t.Fatal("expected error when project name is missing")
+	if err := project.SaveState(dir, s); err != nil {
+		t.Fatalf("SaveState: %v", err)
 	}
-}
-
-func TestSaveConfig_RoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	cfg := &project.Config{
-		Project: project.ProjectMeta{Name: "round_trip", Version: "1.0.0"},
-		OCaml:   project.OCamlMeta{Version: "5.2.0"},
-		Dependencies: map[string]string{
-			"lwt": ">=5.7.0",
-		},
-		DevDependencies: map[string]string{},
-	}
-
-	if err := project.SaveConfig(dir, cfg); err != nil {
-		t.Fatalf("SaveConfig: %v", err)
-	}
-
-	got, err := project.LoadConfig(dir)
+	got, err := project.LoadState(dir)
 	if err != nil {
-		t.Fatalf("LoadConfig after save: %v", err)
+		t.Fatalf("LoadState: %v", err)
 	}
-	if got.Project.Name != cfg.Project.Name {
-		t.Errorf("name: got %q want %q", got.Project.Name, cfg.Project.Name)
+	if got.SwitchPath != s.SwitchPath {
+		t.Errorf("SwitchPath: got %q, want %q", got.SwitchPath, s.SwitchPath)
 	}
-	if got.OCaml.Version != cfg.OCaml.Version {
-		t.Errorf("ocaml version: got %q want %q", got.OCaml.Version, cfg.OCaml.Version)
-	}
-	if v, ok := got.Dependencies["lwt"]; !ok || v != ">=5.7.0" {
-		t.Errorf("dependencies after round-trip: %v", got.Dependencies)
+	if got.OCamlVersion != s.OCamlVersion {
+		t.Errorf("OCamlVersion: got %q, want %q", got.OCamlVersion, s.OCamlVersion)
 	}
 }
 
-func TestLoadLock_Basic(t *testing.T) {
+func TestSaveState_CreatesOCDirectory(t *testing.T) {
 	dir := t.TempDir()
-	content := `
-[ocaml]
-version = "5.2.0"
-
-[[package]]
-name = "cohttp"
-version = "5.0.0"
-
-[[package]]
-name = "lwt"
-version = "5.7.0"
-`
-	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
+	if err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"}); err != nil {
+		t.Fatalf("SaveState: %v", err)
 	}
-
-	lock, err := project.LoadLock(dir)
-	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
-	}
-	if lock.OCaml.Version != "5.2.0" {
-		t.Errorf("ocaml version: got %q", lock.OCaml.Version)
-	}
-	if len(lock.Packages) != 2 {
-		t.Fatalf("expected 2 packages, got %d", len(lock.Packages))
-	}
-	if lock.Packages[0].Name != "cohttp" || lock.Packages[0].Version != "5.0.0" {
-		t.Errorf("package[0]: %+v", lock.Packages[0])
+	if _, err := os.Stat(filepath.Join(dir, ".oc")); err != nil {
+		t.Errorf(".oc directory not created: %v", err)
 	}
 }
 
-func TestLoadLock_Missing(t *testing.T) {
-	lock, err := project.LoadLock(t.TempDir())
-	if err != nil {
-		t.Fatalf("LoadLock missing file should return empty lock, got error: %v", err)
-	}
-	if len(lock.Packages) != 0 {
-		t.Errorf("expected empty packages, got %v", lock.Packages)
-	}
-}
-
-func TestLoadLock_CorruptedFile(t *testing.T) {
+func TestSaveState_NoTempFilesLeft(t *testing.T) {
 	dir := t.TempDir()
-	// Write a file that is present but contains invalid TOML
-	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte("NOT VALID TOML ][[["), 0644); err != nil {
-		t.Fatal(err)
+	if err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"}); err != nil {
+		t.Fatalf("SaveState: %v", err)
 	}
-	lock, err := project.LoadLock(dir)
-	if err == nil {
-		t.Fatal("expected error for corrupted oc.lock, got nil")
-	}
-	if lock != nil {
-		t.Errorf("expected nil lock on error, got %+v", lock)
-	}
-}
-
-func TestSaveLock_NoTempFilesLeftOnSuccess(t *testing.T) {
-	dir := t.TempDir()
-	lock := &project.Lock{OCaml: project.OCamlMeta{Version: "5.2.0"}}
-	if err := project.SaveLock(dir, lock); err != nil {
-		t.Fatal(err)
-	}
-
-	entries, err := os.ReadDir(dir)
+	entries, err := os.ReadDir(filepath.Join(dir, ".oc"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".oc.lock.") && strings.HasSuffix(e.Name(), ".tmp") {
-			t.Errorf("temp file left behind after SaveLock: %s", e.Name())
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind: %s", e.Name())
 		}
 	}
 }
 
-func TestSaveLock_ConcurrentWritesProduceValidFile(t *testing.T) {
+func TestSaveState_ConcurrentWritesProduceValidFile(t *testing.T) {
 	dir := t.TempDir()
-
 	const goroutines = 50
-	var wg sync.WaitGroup
+	var wg gosync.WaitGroup
 	wg.Add(goroutines)
-
 	for i := 0; i < goroutines; i++ {
 		i := i
 		go func() {
 			defer wg.Done()
-			lock := &project.Lock{
-				OCaml:      project.OCamlMeta{Version: "5.2.0"},
-				SwitchPath: fmt.Sprintf("/path/to/switch/%d", i),
-				Packages:   []project.Package{{Name: "pkg", Version: fmt.Sprintf("1.0.%d", i)}},
-			}
-			_ = project.SaveLock(dir, lock)
+			_ = project.SaveState(dir, project.State{
+				SwitchPath:   fmt.Sprintf("/path/%d", i),
+				OCamlVersion: "5.2.0",
+			})
 		}()
 	}
 	wg.Wait()
-
-	_, err := project.LoadLock(dir)
+	_, err := project.LoadState(dir)
 	if err != nil {
-		t.Errorf("after concurrent SaveLock, oc.lock is not parseable: %v", err)
+		t.Errorf("after concurrent SaveState, state.toml is not parseable: %v", err)
 	}
 }
 
-
-func TestSaveLock_RoundTrip(t *testing.T) {
+func TestSaveState_CleansTempFileOnRenameFailure(t *testing.T) {
+	// Force os.Rename to fail by making the destination path a directory.
+	// CreateTemp still succeeds (it uses .oc/ as its dir), but Rename to
+	// state.toml/ (a directory) fails with EISDIR.
 	dir := t.TempDir()
-	lock := &project.Lock{
-		OCaml: project.OCamlMeta{Version: "5.2.0"},
-		Packages: []project.Package{
-			{Name: "cohttp", Version: "5.0.0"},
-			{Name: "lwt", Version: "5.7.0"},
-		},
+	ocDir := filepath.Join(dir, ".oc")
+	if err := os.MkdirAll(filepath.Join(ocDir, "state.toml"), 0755); err != nil {
+		t.Fatal(err)
 	}
-	if err := project.SaveLock(dir, lock); err != nil {
-		t.Fatalf("SaveLock: %v", err)
+
+	err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"})
+	if err == nil {
+		t.Fatal("expected error when rename target is a directory, got nil")
 	}
-	got, err := project.LoadLock(dir)
-	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+
+	entries, _ := os.ReadDir(ocDir)
+	for _, e := range entries {
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind after rename failure: %s", e.Name())
+		}
 	}
-	if len(got.Packages) != 2 {
-		t.Fatalf("expected 2 packages, got %d", len(got.Packages))
+}
+
+func TestParseConstraintParts_GEOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts(">=5.2.0")
+	if op != ">=" || ver != "5.2.0" {
+		t.Errorf("got op=%q ver=%q, want op=\">=\" ver=\"5.2.0\"", op, ver)
 	}
-	if got.Packages[1].Name != "lwt" {
-		t.Errorf("package[1]: %+v", got.Packages[1])
+}
+
+func TestParseConstraintParts_LEOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("<=2.0")
+	if op != "<=" || ver != "2.0" {
+		t.Errorf("got op=%q ver=%q, want op=\"<=\" ver=\"2.0\"", op, ver)
+	}
+}
+
+func TestParseConstraintParts_EqOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("=1.0.0")
+	if op != "=" || ver != "1.0.0" {
+		t.Errorf("got op=%q ver=%q, want op=\"=\" ver=\"1.0.0\"", op, ver)
+	}
+}
+
+func TestParseConstraintParts_NoOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("someversion")
+	if op != "" {
+		t.Errorf("got op=%q, want empty", op)
+	}
+	if ver != "someversion" {
+		t.Errorf("got ver=%q, want %q", ver, "someversion")
+	}
+}
+
+func TestParseConstraintParts_Wildcard(t *testing.T) {
+	op, ver := project.ParseConstraintParts("*")
+	if op != "" || ver != "*" {
+		t.Errorf("got op=%q ver=%q, want op=\"\" ver=\"*\"", op, ver)
 	}
 }

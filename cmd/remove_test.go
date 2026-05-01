@@ -11,15 +11,9 @@ import (
 func TestRunRemove_OpamFailurePropagates(t *testing.T) {
 	dir := t.TempDir()
 
-	// Write a valid oc.toml with a dependency.
-	content := "[project]\nname = \"myapp\"\nversion = \"0.1.0\"\n\n[ocaml]\nversion = \"5.2.0\"\n\n[dependencies]\nfakedep = \"*\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "oc.toml"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	// Write a stub .opam file so opam.Generate doesn't need to create it.
-	opamContent := "opam-version: \"2.0\"\nname: \"myapp\"\n"
-	if err := os.WriteFile(filepath.Join(dir, "myapp.opam"), []byte(opamContent), 0644); err != nil {
+	// Write a dune-project with fakedep in depends.
+	duneProject := "(lang dune 3.0)\n(generate_opam_files true)\n\n(package\n (name myapp)\n (depends\n  (ocaml (>= \"5.2.0\"))\n  dune\n  fakedep))\n"
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte(duneProject), 0644); err != nil {
 		t.Fatal(err)
 	}
 

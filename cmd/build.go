@@ -23,24 +23,18 @@ var buildCmd = &cobra.Command{
 
 // runBuild performs the build for the given project directory.
 func runBuild(dir string) error {
-	cfg, err := project.LoadConfig(dir)
-	if err != nil {
-		return fmt.Errorf("load config: %w", err)
-	}
-
-	if err := sync.Ensure(dir, cfg); err != nil {
+	if err := sync.Ensure(dir); err != nil {
 		return fmt.Errorf("sync: %w", err)
 	}
 
-	lock, err := project.LoadLock(dir)
+	state, err := project.LoadState(dir)
 	if err != nil {
-		return fmt.Errorf("load lockfile: %w", err)
+		return fmt.Errorf("load state: %w", err)
 	}
-	switchPath := lock.SwitchPath
 
 	fmt.Println("Building...")
 	return exec.Run("opam", []string{
-		"exec", "--switch", switchPath, "--", "dune", "build",
+		"exec", "--switch", state.SwitchPath, "--", "dune", "build",
 	}, exec.Options{Dir: dir})
 }
 

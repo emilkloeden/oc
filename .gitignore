@@ -17,6 +17,9 @@ dist/
 *.swp
 *.swo
 
+# oc machine-local state (per-project, never committed)
+.oc/
+
 # Other
 initial.md
 

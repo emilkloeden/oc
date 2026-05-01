@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/emilkloeden/oc/internal/dune"
 	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/emilkloeden/oc/internal/sync"
 	"github.com/spf13/cobra"
 )
-
-var addDev bool
 
 var addCmd = &cobra.Command{
 	Use:   "add <package> [constraint] [<package> [constraint]]...",
@@ -27,29 +26,8 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		cfg, err := project.LoadConfig(dir)
-		if err != nil {
+		if err := runAdd(dir, deps, sync.Ensure); err != nil {
 			return err
-		}
-
-		for _, d := range deps {
-			if addDev {
-				cfg.DevDependencies[d.Name] = d.Constraint
-			} else {
-				cfg.Dependencies[d.Name] = d.Constraint
-			}
-		}
-
-		if err := project.SaveConfig(dir, cfg); err != nil {
-			return fmt.Errorf("save oc.toml: %w", err)
-		}
-		if err := opam.Generate(dir, cfg); err != nil {
-			return fmt.Errorf("regenerate opam file: %w", err)
-		}
-
-		// sync.Ensure installs deps, updates the lockfile, and ensures the switch exists.
-		if err := sync.Ensure(dir, cfg); err != nil {
-			return fmt.Errorf("sync: %w", err)
 		}
 
 		for _, d := range deps {
@@ -57,6 +35,36 @@ var addCmd = &cobra.Command{
 		}
 		return nil
 	},
+}
+
+// runAdd adds deps to the project manifest and syncs.
+func runAdd(dir string, deps []project.Dep, syncFn func(string) error) error {
+	pt, err := project.Detect(dir)
+	if err != nil {
+		return err
+	}
+
+	for _, d := range deps {
+		switch pt {
+		case project.TypeDuneManaged:
+			if err := dune.AddDep(dir, d.Name, d.Constraint); err != nil {
+				return fmt.Errorf("add %s to dune-project: %w", d.Name, err)
+			}
+		case project.TypeHandWrittenOpam:
+			path, err := opam.FindOpamFile(dir)
+			if err != nil {
+				return err
+			}
+			if err := opam.AddDepToOpam(path, d.Name, d.Constraint); err != nil {
+				return fmt.Errorf("add %s to opam file: %w", d.Name, err)
+			}
+		}
+	}
+
+	if err := syncFn(dir); err != nil {
+		return fmt.Errorf("sync: %w", err)
+	}
+	return nil
 }
 
 // isConstraint reports whether an argument looks like a version constraint rather than
@@ -92,6 +100,5 @@ func parseAddArgs(args []string) ([]project.Dep, error) {
 }
 
 func init() {
-	addCmd.Flags().BoolVar(&addDev, "dev", false, "add as a dev dependency")
 	rootCmd.AddCommand(addCmd)
 }

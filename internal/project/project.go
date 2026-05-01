@@ -1,41 +1,53 @@
 package project
 
 import (
+	"bytes"
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
+	"github.com/emilkloeden/oc/internal/atomicfile"
 )
 
-const configFile = "oc.toml"
-const lockFile = "oc.lock"
+const stateDir = ".oc"
+const stateFile = "state.toml"
 
-type ProjectMeta struct {
-	Name       string   `toml:"name"`
-	Version    string   `toml:"version"`
-	Synopsis   string   `toml:"synopsis,omitempty"`
-	Maintainer string   `toml:"maintainer,omitempty"`
-	Authors    []string `toml:"authors,omitempty"`
-	Homepage   string   `toml:"homepage,omitempty"`
-	BugReports string   `toml:"bug-reports,omitempty"`
-	License    string   `toml:"license,omitempty"`
+// State holds machine-local oc state. It is stored in .oc/state.toml and never committed.
+type State struct {
+	SwitchPath   string `toml:"switch_path"`
+	OCamlVersion string `toml:"ocaml_version"`
 }
 
-type OCamlMeta struct {
-	Version string `toml:"version"`
+// LoadState reads .oc/state.toml. A missing file returns an empty State with no error.
+func LoadState(dir string) (State, error) {
+	path := filepath.Join(dir, stateDir, stateFile)
+	data, err := os.ReadFile(path)
+	if os.IsNotExist(err) {
+		return State{}, nil
+	}
+	if err != nil {
+		return State{}, err
+	}
+	var s State
+	if _, err := toml.Decode(string(data), &s); err != nil {
+		return State{}, fmt.Errorf("parse .oc/state.toml: %w", err)
+	}
+	return s, nil
 }
 
-type Config struct {
-	Project         ProjectMeta       `toml:"project"`
-	OCaml           OCamlMeta         `toml:"ocaml"`
-	Dependencies    map[string]string `toml:"dependencies"`
-	DevDependencies map[string]string `toml:"dev-dependencies"`
-}
-
-type Package struct {
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
+// SaveState atomically writes .oc/state.toml, creating .oc/ if needed.
+func SaveState(dir string, s State) error {
+	ocDir := filepath.Join(dir, stateDir)
+	if err := os.MkdirAll(ocDir, 0755); err != nil {
+		return err
+	}
+	var buf bytes.Buffer
+	if err := toml.NewEncoder(&buf).Encode(s); err != nil {
+		return err
+	}
+	return atomicfile.Write(filepath.Join(ocDir, stateFile), buf.Bytes(), 0644)
 }
 
 // Dep represents a package name and its version constraint as parsed from CLI arguments.
@@ -44,83 +56,13 @@ type Dep struct {
 	Constraint string
 }
 
-type Lock struct {
-	OCaml      OCamlMeta `toml:"ocaml"`
-	SwitchPath string    `toml:"switch_path,omitempty"`
-	Packages   []Package `toml:"package"`
-}
-
-func LoadConfig(dir string) (*Config, error) {
-	path := filepath.Join(dir, configFile)
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return nil, fmt.Errorf("oc.toml not found in %s", dir)
+// ParseConstraintParts splits a constraint like ">=5.0.0" into op=">=", ver="5.0.0".
+// Returns op="" if no recognised operator prefix is found.
+func ParseConstraintParts(c string) (op, ver string) {
+	for _, prefix := range []string{">=", "<=", ">", "<", "="} {
+		if strings.HasPrefix(c, prefix) {
+			return prefix, strings.TrimSpace(c[len(prefix):])
+		}
 	}
-
-	var cfg Config
-	if _, err := toml.Decode(string(data), &cfg); err != nil {
-		return nil, fmt.Errorf("parse oc.toml: %w", err)
-	}
-
-	if cfg.Project.Name == "" {
-		return nil, fmt.Errorf("oc.toml: [project] name is required")
-	}
-
-	if cfg.Dependencies == nil {
-		cfg.Dependencies = map[string]string{}
-	}
-	if cfg.DevDependencies == nil {
-		cfg.DevDependencies = map[string]string{}
-	}
-
-	return &cfg, nil
-}
-
-func SaveConfig(dir string, cfg *Config) error {
-	path := filepath.Join(dir, configFile)
-	f, err := os.Create(path)
-	if err != nil {
-		return err
-	}
-	defer func() { _ = f.Close() }()
-	return toml.NewEncoder(f).Encode(cfg)
-}
-
-func LoadLock(dir string) (*Lock, error) {
-	path := filepath.Join(dir, lockFile)
-	data, err := os.ReadFile(path)
-	if os.IsNotExist(err) {
-		return &Lock{}, nil
-	}
-	if err != nil {
-		return nil, err
-	}
-
-	var lock Lock
-	if _, err := toml.Decode(string(data), &lock); err != nil {
-		return nil, fmt.Errorf("parse oc.lock: %w", err)
-	}
-	return &lock, nil
-}
-
-func SaveLock(dir string, lock *Lock) error {
-	path := filepath.Join(dir, lockFile)
-
-	tmp, err := os.CreateTemp(dir, ".oc.lock.*.tmp")
-	if err != nil {
-		return err
-	}
-	tmpPath := tmp.Name()
-
-	if err := toml.NewEncoder(tmp).Encode(lock); err != nil {
-		_ = tmp.Close()
-		_ = os.Remove(tmpPath)
-		return err
-	}
-	if err := tmp.Close(); err != nil {
-		_ = os.Remove(tmpPath)
-		return err
-	}
-
-	return os.Rename(tmpPath, path)
+	return "", c
 }

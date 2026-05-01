@@ -5,34 +5,26 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-
-	"github.com/emilkloeden/oc/internal/project"
 )
 
-func Hash(lock *project.Lock) string {
-	pkgs := make([]project.Package, len(lock.Packages))
-	copy(pkgs, lock.Packages)
-	sort.Slice(pkgs, func(i, j int) bool {
-		if pkgs[i].Name != pkgs[j].Name {
-			return pkgs[i].Name < pkgs[j].Name
-		}
-		return pkgs[i].Version < pkgs[j].Version
-	})
-
-	h := sha256.New()
-	fmt.Fprintf(h, "ocaml=%s\n", lock.OCaml.Version)
-	for _, p := range pkgs {
-		fmt.Fprintf(h, "%s=%s\n", p.Name, p.Version)
+// CachePathForVersion returns the content-addressed switch path for the given OCaml version.
+// All projects using the same OCaml version share the same switch (dependencies accumulate via opam).
+func CachePathForVersion(ocamlVersion string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("determine home directory: %w", err)
 	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:16]
+	h := sha256.New()
+	fmt.Fprintf(h, "ocaml=%s\n", ocamlVersion)
+	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
+	return filepath.Join(home, ".cache", "oc", "switches", hash), nil
 }
 
-func CachePath(lock *project.Lock) string {
-	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "oc", "switches", Hash(lock))
-}
-
+// EnsureSymlink creates or updates the .ocaml symlink in projectDir to point at target.
+// There is an inherent TOCTOU race between Lstat, Remove, and Symlink: a concurrent
+// process could modify the symlink in that window. This is accepted as low risk because
+// oc is an interactive CLI, not a concurrent daemon. The failure mode is a benign
+// "symlink already exists" error on the second invocation, not data loss.
 func EnsureSymlink(projectDir, target string) error {
 	link := filepath.Join(projectDir, ".ocaml")
 
