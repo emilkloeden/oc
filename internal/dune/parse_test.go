@@ -145,6 +145,24 @@ func TestRemoveDep_RemovesConstrainedPackage(t *testing.T) {
 	}
 }
 
+func TestRemoveDep_RemovesMultiLineDep(t *testing.T) {
+	// A constrained dep whose name and constraint span multiple lines.
+	// The line-by-line scanner in isDepLine only matches "(cohttp " (name + space
+	// on the same line); "(cohttp\n..." fails to match and leaves the entry behind.
+	dir := t.TempDir()
+	content := "(lang dune 3.0)\n(generate_opam_files true)\n\n(package\n (name my_app)\n (depends\n  dune\n  (cohttp\n   (>= \"5.0.0\"))))\n"
+	writeDuneProject(t, dir, content)
+
+	if err := dune.RemoveDep(dir, "cohttp"); err != nil {
+		t.Fatalf("RemoveDep: %v", err)
+	}
+
+	result := readDuneProject(t, dir)
+	if strings.Contains(result, "cohttp") {
+		t.Errorf("expected cohttp to be removed:\n%s", result)
+	}
+}
+
 func TestRemoveDep_ErrorWhenPackageNotPresent(t *testing.T) {
 	dir := t.TempDir()
 	writeDuneProject(t, dir, sampleDuneProject)
