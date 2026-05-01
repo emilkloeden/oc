@@ -10,9 +10,10 @@ import (
 	"github.com/emilkloeden/oc/internal/project"
 )
 
-func TestProjectRoot_FindsDuneProject(t *testing.T) {
+func TestProjectRoot_FindsDuneManagedProject(t *testing.T) {
 	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte("(lang dune 3.0)\n"), 0644); err != nil {
+	content := "(lang dune 3.0)\n(generate_opam_files true)\n\n(package\n (name my_app)\n (depends dune))\n"
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte(content), 0644); err != nil {
 		t.Fatal(err)
 	}
 
@@ -27,6 +28,45 @@ func TestProjectRoot_FindsDuneProject(t *testing.T) {
 	}
 	if root != dir {
 		t.Errorf("got %q want %q", root, dir)
+	}
+}
+
+func TestProjectRoot_FindsHandWrittenOpamProject(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "my_app.opam"), []byte("opam-version: \"2.0\"\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	subdir := filepath.Join(dir, "a", "b")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	root, err := cmd.FindProjectRoot(subdir)
+	if err != nil {
+		t.Fatalf("cmd.FindProjectRoot: %v", err)
+	}
+	if root != dir {
+		t.Errorf("got %q want %q", root, dir)
+	}
+}
+
+func TestProjectRoot_DoesNotFindBareDuneProjectWithoutOpam(t *testing.T) {
+	// A bare dune-project (no generate_opam_files, no .opam file) is not
+	// an oc project and should not be accepted as a project root.
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), []byte("(lang dune 3.0)\n"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	subdir := filepath.Join(dir, "a", "b")
+	if err := os.MkdirAll(subdir, 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	_, err := cmd.FindProjectRoot(subdir)
+	if err == nil {
+		t.Error("expected error for bare dune-project without generate_opam_files or .opam, got nil")
 	}
 }
 
