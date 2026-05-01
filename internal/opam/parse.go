@@ -144,3 +144,48 @@ func parseConstraintParts(c string) (op, ver string) {
 	}
 	return "", c
 }
+
+// ReadOCamlVersion reads the OCaml version constraint from the .opam file in dir.
+// It returns the version string from the first `"ocaml" {>= "x.y.z"}` or `{= "x.y.z"}` line.
+func ReadOCamlVersion(dir string) (string, error) {
+	path, err := FindOpamFile(dir)
+	if err != nil {
+		return "", err
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", fmt.Errorf("read opam file: %w", err)
+	}
+	_, end, err := findOpamDepsBounds(string(data))
+	if err != nil {
+		return "", fmt.Errorf("find depends block: %w", err)
+	}
+	// start is index after "depends: ["; search only inside the block
+	start, _, _ := findOpamDepsBounds(string(data))
+	block := string(data)[start:end]
+	for _, line := range strings.Split(block, "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, `"ocaml"`) {
+			continue
+		}
+		// Extract version from {>= "x.y.z"} or {= "x.y.z"}
+		open := strings.Index(trimmed, `"ocaml"`) + len(`"ocaml"`)
+		rest := strings.TrimSpace(trimmed[open:])
+		if !strings.HasPrefix(rest, "{") {
+			continue
+		}
+		inner := strings.TrimPrefix(rest, "{")
+		inner = strings.TrimSuffix(strings.TrimSpace(inner), "}")
+		inner = strings.TrimSpace(inner)
+		for _, op := range []string{">=", "<=", ">", "<", "="} {
+			if strings.HasPrefix(inner, op) {
+				ver := strings.TrimSpace(inner[len(op):])
+				ver = strings.Trim(ver, `"`)
+				if ver != "" {
+					return ver, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("no ocaml version constraint found in %s", path)
+}

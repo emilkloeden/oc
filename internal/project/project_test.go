@@ -5,134 +5,90 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-	"sync"
+	gosync "sync"
 	"testing"
 
 	"github.com/emilkloeden/oc/internal/project"
 )
 
-func TestLoadLock_Basic(t *testing.T) {
-	dir := t.TempDir()
-	content := `
-[ocaml]
-version = "5.2.0"
-
-[[package]]
-name = "cohttp"
-version = "5.0.0"
-
-[[package]]
-name = "lwt"
-version = "5.7.0"
-`
-	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte(content), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	lock, err := project.LoadLock(dir)
+func TestLoadState_Missing(t *testing.T) {
+	s, err := project.LoadState(t.TempDir())
 	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
+		t.Fatalf("LoadState missing file should return empty State, got error: %v", err)
 	}
-	if lock.OCaml.Version != "5.2.0" {
-		t.Errorf("ocaml version: got %q", lock.OCaml.Version)
+	if s.SwitchPath != "" {
+		t.Errorf("expected empty SwitchPath, got %q", s.SwitchPath)
 	}
-	if len(lock.Packages) != 2 {
-		t.Fatalf("expected 2 packages, got %d", len(lock.Packages))
-	}
-	if lock.Packages[0].Name != "cohttp" || lock.Packages[0].Version != "5.0.0" {
-		t.Errorf("package[0]: %+v", lock.Packages[0])
+	if s.OCamlVersion != "" {
+		t.Errorf("expected empty OCamlVersion, got %q", s.OCamlVersion)
 	}
 }
 
-func TestLoadLock_Missing(t *testing.T) {
-	lock, err := project.LoadLock(t.TempDir())
+func TestSaveState_RoundTrip(t *testing.T) {
+	dir := t.TempDir()
+	s := project.State{
+		SwitchPath:   "/cache/oc/switches/abc123/",
+		OCamlVersion: "5.2.0",
+	}
+	if err := project.SaveState(dir, s); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+	got, err := project.LoadState(dir)
 	if err != nil {
-		t.Fatalf("LoadLock missing file should return empty lock, got error: %v", err)
+		t.Fatalf("LoadState: %v", err)
 	}
-	if len(lock.Packages) != 0 {
-		t.Errorf("expected empty packages, got %v", lock.Packages)
+	if got.SwitchPath != s.SwitchPath {
+		t.Errorf("SwitchPath: got %q, want %q", got.SwitchPath, s.SwitchPath)
 	}
-}
-
-func TestLoadLock_CorruptedFile(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "oc.lock"), []byte("NOT VALID TOML ][[["), 0644); err != nil {
-		t.Fatal(err)
-	}
-	lock, err := project.LoadLock(dir)
-	if err == nil {
-		t.Fatal("expected error for corrupted oc.lock, got nil")
-	}
-	if lock != nil {
-		t.Errorf("expected nil lock on error, got %+v", lock)
+	if got.OCamlVersion != s.OCamlVersion {
+		t.Errorf("OCamlVersion: got %q, want %q", got.OCamlVersion, s.OCamlVersion)
 	}
 }
 
-func TestSaveLock_NoTempFilesLeftOnSuccess(t *testing.T) {
+func TestSaveState_CreatesOCDirectory(t *testing.T) {
 	dir := t.TempDir()
-	lock := &project.Lock{OCaml: project.OCamlMeta{Version: "5.2.0"}}
-	if err := project.SaveLock(dir, lock); err != nil {
-		t.Fatal(err)
+	if err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"}); err != nil {
+		t.Fatalf("SaveState: %v", err)
 	}
+	if _, err := os.Stat(filepath.Join(dir, ".oc")); err != nil {
+		t.Errorf(".oc directory not created: %v", err)
+	}
+}
 
-	entries, err := os.ReadDir(dir)
+func TestSaveState_NoTempFilesLeft(t *testing.T) {
+	dir := t.TempDir()
+	if err := project.SaveState(dir, project.State{SwitchPath: "/tmp/sw"}); err != nil {
+		t.Fatalf("SaveState: %v", err)
+	}
+	entries, err := os.ReadDir(filepath.Join(dir, ".oc"))
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, e := range entries {
-		if strings.HasPrefix(e.Name(), ".oc.lock.") && strings.HasSuffix(e.Name(), ".tmp") {
-			t.Errorf("temp file left behind after SaveLock: %s", e.Name())
+		if strings.HasSuffix(e.Name(), ".tmp") {
+			t.Errorf("temp file left behind: %s", e.Name())
 		}
 	}
 }
 
-func TestSaveLock_ConcurrentWritesProduceValidFile(t *testing.T) {
+func TestSaveState_ConcurrentWritesProduceValidFile(t *testing.T) {
 	dir := t.TempDir()
-
 	const goroutines = 50
-	var wg sync.WaitGroup
+	var wg gosync.WaitGroup
 	wg.Add(goroutines)
-
 	for i := 0; i < goroutines; i++ {
 		i := i
 		go func() {
 			defer wg.Done()
-			lock := &project.Lock{
-				OCaml:      project.OCamlMeta{Version: "5.2.0"},
-				SwitchPath: fmt.Sprintf("/path/to/switch/%d", i),
-				Packages:   []project.Package{{Name: "pkg", Version: fmt.Sprintf("1.0.%d", i)}},
-			}
-			_ = project.SaveLock(dir, lock)
+			_ = project.SaveState(dir, project.State{
+				SwitchPath:   fmt.Sprintf("/path/%d", i),
+				OCamlVersion: "5.2.0",
+			})
 		}()
 	}
 	wg.Wait()
-
-	_, err := project.LoadLock(dir)
+	_, err := project.LoadState(dir)
 	if err != nil {
-		t.Errorf("after concurrent SaveLock, oc.lock is not parseable: %v", err)
-	}
-}
-
-func TestSaveLock_RoundTrip(t *testing.T) {
-	dir := t.TempDir()
-	lock := &project.Lock{
-		OCaml: project.OCamlMeta{Version: "5.2.0"},
-		Packages: []project.Package{
-			{Name: "cohttp", Version: "5.0.0"},
-			{Name: "lwt", Version: "5.7.0"},
-		},
-	}
-	if err := project.SaveLock(dir, lock); err != nil {
-		t.Fatalf("SaveLock: %v", err)
-	}
-	got, err := project.LoadLock(dir)
-	if err != nil {
-		t.Fatalf("LoadLock: %v", err)
-	}
-	if len(got.Packages) != 2 {
-		t.Fatalf("expected 2 packages, got %d", len(got.Packages))
-	}
-	if got.Packages[1].Name != "lwt" {
-		t.Errorf("package[1]: %+v", got.Packages[1])
+		t.Errorf("after concurrent SaveState, state.toml is not parseable: %v", err)
 	}
 }

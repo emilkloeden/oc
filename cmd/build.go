@@ -27,15 +27,14 @@ func runBuild(dir string) error {
 		return fmt.Errorf("sync: %w", err)
 	}
 
-	lock, err := project.LoadLock(dir)
+	state, err := project.LoadState(dir)
 	if err != nil {
-		return fmt.Errorf("load lockfile: %w", err)
+		return fmt.Errorf("load state: %w", err)
 	}
-	switchPath := lock.SwitchPath
 
 	fmt.Println("Building...")
 	return exec.Run("opam", []string{
-		"exec", "--switch", switchPath, "--", "dune", "build",
+		"exec", "--switch", state.SwitchPath, "--", "dune", "build",
 	}, exec.Options{Dir: dir})
 }
 

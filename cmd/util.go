@@ -31,9 +31,12 @@ func findProjectRoot(start string) (string, error) {
 }
 
 // isProjectDir reports whether dir looks like an OCaml project root.
-// A project root has either a dune-project file or a *.opam file.
+// Recognised markers: dune-project, *.opam file, or .oc/ directory (oc state).
 func isProjectDir(dir string) bool {
 	if _, err := os.Stat(filepath.Join(dir, "dune-project")); err == nil {
+		return true
+	}
+	if _, err := os.Stat(filepath.Join(dir, ".oc")); err == nil {
 		return true
 	}
 	entries, err := os.ReadDir(dir)

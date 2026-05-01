@@ -12,6 +12,12 @@ var currentVersion = "dev"
 var rootCmd = &cobra.Command{
 	Use:   "oc",
 	Short: "A Cargo-like developer experience for OCaml",
+	PersistentPreRun: func(cmd *cobra.Command, args []string) {
+		// Silently migrate oc.lock → .oc/state.toml on first run after upgrade.
+		if dir, err := projectRoot(); err == nil {
+			migrateIfNeeded(dir)
+		}
+	},
 }
 
 func Execute() {

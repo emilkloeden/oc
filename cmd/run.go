@@ -37,14 +37,13 @@ func runRun(dir string, args []string) error {
 		return fmt.Errorf("sync: %w", err)
 	}
 
-	lock, err := project.LoadLock(dir)
+	state, err := project.LoadState(dir)
 	if err != nil {
-		return fmt.Errorf("load lockfile: %w", err)
+		return fmt.Errorf("load state: %w", err)
 	}
-	switchPath := lock.SwitchPath
 
 	fmt.Println("Building and running...")
-	return exec.Run("opam", buildRunArgs(switchPath, args...), exec.Options{Dir: dir})
+	return exec.Run("opam", buildRunArgs(state.SwitchPath, args...), exec.Options{Dir: dir})
 }
 
 func init() {

@@ -38,7 +38,7 @@ func TestNew_GitignoreExcludesOcamlDir(t *testing.T) {
 	if err != nil {
 		t.Fatalf("read .gitignore: %v", err)
 	}
-	for _, entry := range []string{".ocaml/", "_build/"} {
+	for _, entry := range []string{".ocaml/", ".oc/", "_build/"} {
 		found := false
 		for _, line := range splitLines(string(content)) {
 			if line == entry {
@@ -111,19 +111,19 @@ func TestNew_DuneProjectHasPackageStanza(t *testing.T) {
 	}
 }
 
-func TestNew_CreatesInitialLockWithOcamlVersion(t *testing.T) {
+func TestNew_CreatesInitialStateWithOcamlVersion(t *testing.T) {
 	dir := t.TempDir()
 	if err := cmd.RunNew(dir, "my_app", false); err != nil {
 		t.Fatalf("RunNew: %v", err)
 	}
 
-	lockPath := filepath.Join(dir, "my_app", "oc.lock")
-	if _, err := os.Stat(lockPath); err != nil {
-		t.Fatalf("expected oc.lock to exist: %v", err)
+	statePath := filepath.Join(dir, "my_app", ".oc", "state.toml")
+	if _, err := os.Stat(statePath); err != nil {
+		t.Fatalf("expected .oc/state.toml to exist: %v", err)
 	}
-	content, _ := os.ReadFile(lockPath)
+	content, _ := os.ReadFile(statePath)
 	if !strings.Contains(string(content), "5.2.0") {
-		t.Errorf("expected oc.lock to contain default OCaml version 5.2.0:\n%s", content)
+		t.Errorf("expected .oc/state.toml to contain default OCaml version 5.2.0:\n%s", content)
 	}
 }
 
