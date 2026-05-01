@@ -168,6 +168,46 @@ func TestGetPackageName_ReturnsName(t *testing.T) {
 	}
 }
 
+func TestGetPackageName_NameAfterSynopsisWithParens(t *testing.T) {
+	// synopsis contains "(name foo)" — an unbounded Index would return "foo"
+	// instead of the real package name when name stanza follows synopsis.
+	dir := t.TempDir()
+	content := `(lang dune 3.0)
+(generate_opam_files true)
+
+(package
+ (synopsis "Fixes (name resolution) issues")
+ (name my_app)
+ (depends dune))
+`
+	writeDuneProject(t, dir, content)
+	name, err := dune.GetPackageName(dir)
+	if err != nil {
+		t.Fatalf("GetPackageName: %v", err)
+	}
+	if name != "my_app" {
+		t.Errorf("got %q, want %q", name, "my_app")
+	}
+}
+
+func TestGetPackageName_NameNotFoundInBlock(t *testing.T) {
+	// A package stanza without (name ...) — should return an error,
+	// not silently return a name from later in the file.
+	dir := t.TempDir()
+	content := `(lang dune 3.0)
+(generate_opam_files true)
+
+(package
+ (synopsis "no name here")
+ (depends dune))
+`
+	writeDuneProject(t, dir, content)
+	_, err := dune.GetPackageName(dir)
+	if err == nil {
+		t.Fatal("expected error when (name ...) is absent from the package block")
+	}
+}
+
 func TestHasGenerateOpamFiles_TrueWhenPresent(t *testing.T) {
 	dir := t.TempDir()
 	writeDuneProject(t, dir, sampleDuneProject)

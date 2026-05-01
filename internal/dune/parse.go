@@ -24,22 +24,99 @@ func GetPackageName(dir string) (string, error) {
 	}
 	content := string(data)
 
-	// Find (package ...) then (name ...)
-	pkgStart := strings.Index(content, "(package")
-	if pkgStart < 0 {
-		return "", fmt.Errorf("no (package ...) stanza in dune-project")
+	pkgStart, pkgEnd, err := findStanzaBounds(content, "(package")
+	if err != nil {
+		return "", fmt.Errorf("no (package ...) stanza in dune-project: %w", err)
 	}
-	sub := content[pkgStart:]
-	nameStart := strings.Index(sub, "(name ")
-	if nameStart < 0 {
+	pkgInterior := content[pkgStart:pkgEnd]
+
+	name, err := findTopLevelAtom(pkgInterior, "name")
+	if err != nil {
 		return "", fmt.Errorf("no (name ...) in (package ...) stanza")
 	}
-	after := sub[nameStart+len("(name "):]
-	end := strings.IndexAny(after, ") \t\n")
-	if end < 0 {
-		return "", fmt.Errorf("malformed (name ...) in dune-project")
+	return name, nil
+}
+
+// findTopLevelAtom scans the interior of a stanza for a top-level (keyword value)
+// child, skipping strings and nested stanzas, and returns value.
+func findTopLevelAtom(interior, keyword string) (string, error) {
+	prefix := "(" + keyword + " "
+	i := 0
+	inString := false
+	depth := 0
+	for i < len(interior) {
+		c := interior[i]
+		if inString {
+			if c == '"' {
+				inString = false
+			} else if c == '\\' {
+				i++
+			}
+			i++
+			continue
+		}
+		if c == '"' {
+			inString = true
+			i++
+			continue
+		}
+		if c == '(' {
+			if depth == 0 && strings.HasPrefix(interior[i:], prefix) {
+				after := interior[i+len(prefix):]
+				end := strings.IndexAny(after, ") \t\n\r")
+				if end < 0 {
+					return "", fmt.Errorf("malformed (%s ...) stanza", keyword)
+				}
+				val := strings.TrimSpace(after[:end])
+				if val != "" {
+					return val, nil
+				}
+			}
+			depth++
+			i++
+			continue
+		}
+		if c == ')' {
+			if depth > 0 {
+				depth--
+			}
+		}
+		i++
 	}
-	return strings.TrimSpace(after[:end]), nil
+	return "", fmt.Errorf("(%s ...) not found", keyword)
+}
+
+// findStanzaBounds finds the interior of a stanza starting with keyword (e.g. "(package").
+// Returns start (after keyword) and end (position of matching closing ')').
+func findStanzaBounds(content, keyword string) (start, end int, err error) {
+	idx := strings.Index(content, keyword)
+	if idx < 0 {
+		return 0, 0, fmt.Errorf("%q not found", keyword)
+	}
+	start = idx + len(keyword)
+	depth := 1
+	i := start
+	inString := false
+	for i < len(content) {
+		c := content[i]
+		switch {
+		case inString && c == '"':
+			inString = false
+		case inString && c == '\\':
+			i++
+		case !inString && c == '"':
+			inString = true
+		case !inString && c == '(':
+			depth++
+		case !inString && c == ')':
+			depth--
+			if depth == 0 {
+				return start, i, nil
+			}
+		}
+		i++
+	}
+	return 0, 0, fmt.Errorf("unterminated %q stanza", keyword)
 }
 
 // AddDep adds a dependency to the (depends ...) stanza in dune-project.
@@ -103,35 +180,11 @@ func RemoveDep(dir, pkg string) error {
 // Returns the start and end positions of the content between '(' depends and matching ')'.
 // 'start' points to after "(depends", 'end' points to the position of the closing ')'.
 func findDepsBounds(content string) (start, end int, err error) {
-	idx := strings.Index(content, "(depends")
-	if idx < 0 {
+	start, end, err = findStanzaBounds(content, "(depends")
+	if err != nil {
 		return 0, 0, fmt.Errorf("no (depends ...) stanza in dune-project")
 	}
-	// start is after "(depends"
-	start = idx + len("(depends")
-	depth := 1
-	i := start
-	inString := false
-	for i < len(content) {
-		c := content[i]
-		switch {
-		case inString && c == '"':
-			inString = false
-		case inString && c == '\\':
-			i++
-		case !inString && c == '"':
-			inString = true
-		case !inString && c == '(':
-			depth++
-		case !inString && c == ')':
-			depth--
-			if depth == 0 {
-				return start, i, nil
-			}
-		}
-		i++
-	}
-	return 0, 0, fmt.Errorf("unterminated (depends ...) stanza")
+	return start, end, nil
 }
 
 // hasDep reports whether pkg appears as a dependency name in content.
