@@ -38,7 +38,7 @@ func TestRunAdd_DuneManagedProject_AddsToduneProject(t *testing.T) {
 	}
 
 	deps := []project.Dep{{Name: "yojson", Constraint: "*"}}
-	if err := cmd.RunAdd(dir, deps, false, noopSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, noopSync); err != nil {
 		t.Fatalf("RunAdd: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestRunAdd_DuneManagedProject_AddsWithConstraint(t *testing.T) {
 	}
 
 	deps := []project.Dep{{Name: "cohttp", Constraint: ">=5.0.0"}}
-	if err := cmd.RunAdd(dir, deps, false, noopSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, noopSync); err != nil {
 		t.Fatalf("RunAdd: %v", err)
 	}
 
@@ -72,7 +72,7 @@ func TestRunAdd_HandWrittenOpam_AddsToOpamFile(t *testing.T) {
 	}
 
 	deps := []project.Dep{{Name: "yojson", Constraint: "*"}}
-	if err := cmd.RunAdd(dir, deps, false, noopSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, noopSync); err != nil {
 		t.Fatalf("RunAdd: %v", err)
 	}
 
@@ -89,10 +89,10 @@ func TestRunAdd_DuneManagedProject_IdempotentAdd(t *testing.T) {
 	}
 
 	deps := []project.Dep{{Name: "yojson", Constraint: "*"}}
-	if err := cmd.RunAdd(dir, deps, false, noopSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, noopSync); err != nil {
 		t.Fatalf("first RunAdd: %v", err)
 	}
-	if err := cmd.RunAdd(dir, deps, false, noopSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, noopSync); err != nil {
 		t.Fatalf("second RunAdd: %v", err)
 	}
 
@@ -116,7 +116,7 @@ func TestRunAdd_SyncFuncCalledWithProjectDir(t *testing.T) {
 	}
 
 	deps := []project.Dep{{Name: "yojson", Constraint: "*"}}
-	if err := cmd.RunAdd(dir, deps, false, captureSync); err != nil {
+	if err := cmd.RunAdd(dir, deps, captureSync); err != nil {
 		t.Fatalf("RunAdd: %v", err)
 	}
 

@@ -11,8 +11,6 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var addDev bool
-
 var addCmd = &cobra.Command{
 	Use:   "add <package> [constraint] [<package> [constraint]]...",
 	Short: "Add one or more dependencies to the project",
@@ -28,7 +26,7 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		if err := runAdd(dir, deps, addDev, sync.Ensure); err != nil {
+		if err := runAdd(dir, deps, sync.Ensure); err != nil {
 			return err
 		}
 
@@ -40,7 +38,7 @@ var addCmd = &cobra.Command{
 }
 
 // runAdd adds deps to the project manifest and syncs.
-func runAdd(dir string, deps []project.Dep, dev bool, syncFn func(string) error) error {
+func runAdd(dir string, deps []project.Dep, syncFn func(string) error) error {
 	pt, err := project.Detect(dir)
 	if err != nil {
 		return err
@@ -102,6 +100,5 @@ func parseAddArgs(args []string) ([]project.Dep, error) {
 }
 
 func init() {
-	addCmd.Flags().BoolVar(&addDev, "dev", false, "add as a dev dependency")
 	rootCmd.AddCommand(addCmd)
 }
