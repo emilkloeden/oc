@@ -4,13 +4,12 @@ import (
 	"fmt"
 	"os"
 
+	"github.com/emilkloeden/oc/internal/defaults"
 	"github.com/emilkloeden/oc/internal/exec"
 	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
 	swmgr "github.com/emilkloeden/oc/internal/switch"
 )
-
-const defaultOCamlVersion = "5.2.0"
 
 type OpamRunner interface {
 	SwitchExists(path string) bool
@@ -55,7 +54,7 @@ func Ensure(dir string) error {
 	}
 	ocamlVersion, err := opam.ReadOCamlVersion(dir)
 	if err != nil {
-		ocamlVersion = defaultOCamlVersion
+		ocamlVersion = defaults.DefaultOCamlVersion
 	}
 	return EnsureWith(dir, ocamlVersion, &realRunner{})
 }
