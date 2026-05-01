@@ -186,6 +186,29 @@ func TestReadOCamlVersion_MissingOpamFile(t *testing.T) {
 	}
 }
 
+func TestAddDepToOpam_InsertsInsideDependsBlockNotAtFileStart(t *testing.T) {
+	// Ensures insertion uses the correct block bounds (end position),
+	// not position 0 (which would prepend before the file header).
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+name: "my_app"
+depends: [
+  "dune" {>= "3.0"}
+]
+`
+	path := writeOpam(t, dir, "my_app", content)
+	if err := opam.AddDepToOpam(path, "yojson", "*"); err != nil {
+		t.Fatalf("AddDepToOpam: %v", err)
+	}
+	result, _ := os.ReadFile(path)
+	// yojson must appear inside the depends block, after the opening "["
+	depIdx := strings.Index(string(result), `"yojson"`)
+	dependsIdx := strings.Index(string(result), "depends: [")
+	if depIdx < dependsIdx {
+		t.Errorf("yojson was inserted before the depends block (depIdx=%d < dependsIdx=%d)", depIdx, dependsIdx)
+	}
+}
+
 func TestReadOCamlVersion_ReadsFromDependsBlockOnly(t *testing.T) {
 	// Verify the function scans only the depends block, not the full file.
 	// A file with depopts before depends: the depopts block ends with ']' before
