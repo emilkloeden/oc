@@ -49,21 +49,18 @@ func findTopLevelAtom(interior, keyword string) (string, error) {
 	depth := 0
 	for i < len(interior) {
 		c := interior[i]
-		if inString {
-			if c == '"' {
-				inString = false
-			} else if c == '\\' {
-				i++
-			}
+		switch {
+		case inString && c == '"':
+			inString = false
 			i++
-			continue
-		}
-		if c == '"' {
+		case inString && c == '\\':
+			i += 2
+		case inString:
+			i++
+		case c == '"':
 			inString = true
 			i++
-			continue
-		}
-		if c == '(' {
+		case c == '(':
 			if depth == 0 && strings.HasPrefix(interior[i:], prefix) {
 				after := interior[i+len(prefix):]
 				end := strings.IndexAny(after, ") \t\n\r")
@@ -77,14 +74,14 @@ func findTopLevelAtom(interior, keyword string) (string, error) {
 			}
 			depth++
 			i++
-			continue
-		}
-		if c == ')' {
+		case c == ')':
 			if depth > 0 {
 				depth--
 			}
+			i++
+		default:
+			i++
 		}
-		i++
 	}
 	return "", fmt.Errorf("(%s ...) not found", keyword)
 }
