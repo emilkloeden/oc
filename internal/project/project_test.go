@@ -92,3 +92,41 @@ func TestSaveState_ConcurrentWritesProduceValidFile(t *testing.T) {
 		t.Errorf("after concurrent SaveState, state.toml is not parseable: %v", err)
 	}
 }
+
+func TestParseConstraintParts_GEOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts(">=5.2.0")
+	if op != ">=" || ver != "5.2.0" {
+		t.Errorf("got op=%q ver=%q, want op=\">=\" ver=\"5.2.0\"", op, ver)
+	}
+}
+
+func TestParseConstraintParts_LEOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("<=2.0")
+	if op != "<=" || ver != "2.0" {
+		t.Errorf("got op=%q ver=%q, want op=\"<=\" ver=\"2.0\"", op, ver)
+	}
+}
+
+func TestParseConstraintParts_EqOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("=1.0.0")
+	if op != "=" || ver != "1.0.0" {
+		t.Errorf("got op=%q ver=%q, want op=\"=\" ver=\"1.0.0\"", op, ver)
+	}
+}
+
+func TestParseConstraintParts_NoOperator(t *testing.T) {
+	op, ver := project.ParseConstraintParts("someversion")
+	if op != "" {
+		t.Errorf("got op=%q, want empty", op)
+	}
+	if ver != "someversion" {
+		t.Errorf("got ver=%q, want %q", ver, "someversion")
+	}
+}
+
+func TestParseConstraintParts_Wildcard(t *testing.T) {
+	op, ver := project.ParseConstraintParts("*")
+	if op != "" || ver != "*" {
+		t.Errorf("got op=%q ver=%q, want op=\"\" ver=\"*\"", op, ver)
+	}
+}

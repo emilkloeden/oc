@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/emilkloeden/oc/internal/project"
 )
 
 // HasGenerateOpamFiles reports whether dune-project in dir contains (generate_opam_files true).
@@ -402,19 +404,9 @@ func formatDuneDepEntry(pkg, constraint string) string {
 	if constraint == "*" || constraint == "" {
 		return pkg
 	}
-	op, ver := parseConstraintParts(constraint)
+	op, ver := project.ParseConstraintParts(constraint)
 	if op == "" {
 		return pkg
 	}
 	return fmt.Sprintf("(%s (%s %q))", pkg, op, ver)
-}
-
-// parseConstraintParts splits a constraint like ">=5.0.0" into op=">=", ver="5.0.0".
-func parseConstraintParts(c string) (op, ver string) {
-	for _, prefix := range []string{">=", "<=", ">", "<", "="} {
-		if strings.HasPrefix(c, prefix) {
-			return prefix, strings.TrimSpace(c[len(prefix):])
-		}
-	}
-	return "", c
 }

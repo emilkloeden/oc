@@ -5,6 +5,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/emilkloeden/oc/internal/project"
 )
 
 // FindOpamFile returns the path to the single *.opam file in dir.
@@ -127,21 +129,11 @@ func formatOpamDepEntry(pkg, constraint string) string {
 	if constraint == "*" || constraint == "" {
 		return fmt.Sprintf("%q", pkg)
 	}
-	op, ver := parseConstraintParts(constraint)
+	op, ver := project.ParseConstraintParts(constraint)
 	if op == "" {
 		return fmt.Sprintf("%q", pkg)
 	}
 	return fmt.Sprintf("%q {%s %q}", pkg, op, ver)
-}
-
-// parseConstraintParts splits a constraint like ">=5.0.0" into op=">=", ver="5.0.0".
-func parseConstraintParts(c string) (op, ver string) {
-	for _, prefix := range []string{">=", "<=", ">", "<", "="} {
-		if strings.HasPrefix(c, prefix) {
-			return prefix, strings.TrimSpace(c[len(prefix):])
-		}
-	}
-	return "", c
 }
 
 // ReadOCamlVersion reads the OCaml version constraint from the .opam file in dir.
