@@ -378,27 +378,6 @@ func removeDuneDepEntry(interior, pkg string) (string, bool) {
 	return out.String(), true
 }
 
-// countParenDepth returns the net paren depth of a string (opens - closes).
-func countParenDepth(s string) int {
-	depth := 0
-	inStr := false
-	for i := 0; i < len(s); i++ {
-		c := s[i]
-		switch {
-		case inStr && c == '"':
-			inStr = false
-		case inStr && c == '\\':
-			i++
-		case !inStr && c == '"':
-			inStr = true
-		case !inStr && c == '(':
-			depth++
-		case !inStr && c == ')':
-			depth--
-		}
-	}
-	return depth
-}
 
 // formatDuneDepEntry formats a dep entry for insertion into a dune-project depends block.
 func formatDuneDepEntry(pkg, constraint string) string {
