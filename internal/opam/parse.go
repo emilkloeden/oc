@@ -45,11 +45,10 @@ func AddDepToOpam(path, pkg, constraint string) error {
 	entry := formatOpamDepEntry(pkg, constraint)
 
 	// Find the closing ']' of the depends: block and insert before it
-	start, end, err := findOpamDepsBounds(content)
+	_, end, err := findOpamDepsBounds(content)
 	if err != nil {
 		return err
 	}
-	_ = start
 
 	newContent := content[:end] + "  " + entry + "\n" + content[end:]
 	return os.WriteFile(path, []byte(newContent), 0644)
