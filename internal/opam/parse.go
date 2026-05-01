@@ -83,24 +83,45 @@ func RemoveDepFromOpam(path, pkg string) error {
 }
 
 // findOpamDepsBounds finds the start and end positions of the depends: block.
-// 'start' is after "depends: [", 'end' is the position of the closing ']'.
+// 'start' is after the opening '[', 'end' is the position of the matching closing ']'.
+// Uses depth-tracking to correctly handle nested [...] inside the block.
 func findOpamDepsBounds(content string) (start, end int, err error) {
+	var opener string
 	idx := strings.Index(content, "depends: [")
-	if idx < 0 {
+	if idx >= 0 {
+		opener = "depends: ["
+	} else {
 		idx = strings.Index(content, "depends:[")
 		if idx < 0 {
 			return 0, 0, fmt.Errorf("no depends: field found in opam file")
 		}
-		start = idx + len("depends:[")
-	} else {
-		start = idx + len("depends: [")
+		opener = "depends:["
 	}
+	start = idx + len(opener)
 
-	end = strings.Index(content[start:], "]")
-	if end < 0 {
-		return 0, 0, fmt.Errorf("unterminated depends: block in opam file")
+	depth := 1
+	i := start
+	inString := false
+	for i < len(content) {
+		c := content[i]
+		switch {
+		case inString && c == '"':
+			inString = false
+		case inString && c == '\\':
+			i++
+		case !inString && c == '"':
+			inString = true
+		case !inString && c == '[':
+			depth++
+		case !inString && c == ']':
+			depth--
+			if depth == 0 {
+				return start, i, nil
+			}
+		}
+		i++
 	}
-	return start, start + end, nil
+	return 0, 0, fmt.Errorf("unterminated depends: block in opam file")
 }
 
 // opamHasDep reports whether pkg appears in the depends: block of an opam file.
