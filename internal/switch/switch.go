@@ -9,12 +9,15 @@ import (
 
 // CachePathForVersion returns the content-addressed switch path for the given OCaml version.
 // All projects using the same OCaml version share the same switch (dependencies accumulate via opam).
-func CachePathForVersion(ocamlVersion string) string {
-	home, _ := os.UserHomeDir()
+func CachePathForVersion(ocamlVersion string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("determine home directory: %w", err)
+	}
 	h := sha256.New()
 	fmt.Fprintf(h, "ocaml=%s\n", ocamlVersion)
 	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
-	return filepath.Join(home, ".cache", "oc", "switches", hash)
+	return filepath.Join(home, ".cache", "oc", "switches", hash), nil
 }
 
 // EnsureSymlink creates or updates the .ocaml symlink in projectDir to point at target.

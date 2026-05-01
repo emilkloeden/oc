@@ -10,23 +10,38 @@ import (
 )
 
 func TestCachePathForVersion_Deterministic(t *testing.T) {
-	p1 := sw.CachePathForVersion("5.2.0")
-	p2 := sw.CachePathForVersion("5.2.0")
+	p1, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	p2, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
 	if p1 != p2 {
 		t.Errorf("CachePathForVersion not deterministic: %q vs %q", p1, p2)
 	}
 }
 
 func TestCachePathForVersion_DiffersForDifferentVersions(t *testing.T) {
-	p1 := sw.CachePathForVersion("5.2.0")
-	p2 := sw.CachePathForVersion("5.3.0")
+	p1, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
+	p2, err := sw.CachePathForVersion("5.3.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
 	if p1 == p2 {
 		t.Error("different OCaml versions should produce different cache paths")
 	}
 }
 
 func TestCachePathForVersion_ContainsExpectedSegments(t *testing.T) {
-	path := sw.CachePathForVersion("5.2.0")
+	path, err := sw.CachePathForVersion("5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForVersion: %v", err)
+	}
 	if !strings.Contains(path, filepath.Join(".cache", "oc", "switches")) {
 		t.Errorf("unexpected path structure: %q", path)
 	}
