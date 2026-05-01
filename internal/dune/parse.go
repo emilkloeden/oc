@@ -171,12 +171,12 @@ func containsDepName(block, pkg string) bool {
 			// read the first atom inside this list
 			i++
 			// skip whitespace
-			for i < len(block) && (block[i] == ' ' || block[i] == '\t' || block[i] == '\n') {
+			for i < len(block) && (block[i] == ' ' || block[i] == '\t' || block[i] == '\n' || block[i] == '\r') {
 				i++
 			}
 			// read atom
 			start := i
-			for i < len(block) && block[i] != ' ' && block[i] != '\t' && block[i] != '\n' && block[i] != ')' && block[i] != '(' {
+			for i < len(block) && block[i] != ' ' && block[i] != '\t' && block[i] != '\n' && block[i] != '\r' && block[i] != ')' && block[i] != '(' {
 				i++
 			}
 			name := block[start:i]
@@ -206,7 +206,7 @@ func containsDepName(block, pkg string) bool {
 		}
 		// bare atom
 		start := i
-		for i < len(block) && block[i] != ' ' && block[i] != '\t' && block[i] != '\n' && block[i] != ')' && block[i] != '(' {
+		for i < len(block) && block[i] != ' ' && block[i] != '\t' && block[i] != '\n' && block[i] != '\r' && block[i] != ')' && block[i] != '(' {
 			i++
 		}
 		name := block[start:i]

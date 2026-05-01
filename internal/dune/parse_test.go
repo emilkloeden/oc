@@ -186,3 +186,67 @@ func TestHasGenerateOpamFiles_FalseWhenAbsent(t *testing.T) {
 		t.Error("expected HasGenerateOpamFiles to return false")
 	}
 }
+
+func writeDuneProjectBytes(t *testing.T, dir string, content []byte) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(dir, "dune-project"), content, 0644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAddDep_IdempotentWithCRLFLineEndings(t *testing.T) {
+	// CRLF-encoded dune-project files (Windows or git autocrlf) must not cause
+	// hasDep to miss existing entries, which would produce duplicate deps.
+	dir := t.TempDir()
+	lf := "(lang dune 3.0)\r\n(generate_opam_files true)\r\n\r\n(package\r\n (name my_app)\r\n (depends\r\n  dune\r\n  yojson))\r\n"
+	writeDuneProjectBytes(t, dir, []byte(lf))
+
+	if err := dune.AddDep(dir, "yojson", "*"); err != nil {
+		t.Fatalf("AddDep: %v", err)
+	}
+
+	result := readDuneProject(t, dir)
+	count := strings.Count(result, "yojson")
+	if count != 1 {
+		t.Errorf("expected yojson exactly once after idempotent add on CRLF file, got %d:\n%s", count, result)
+	}
+}
+
+func TestAddDep_IdempotentCRLFConstrainedDep(t *testing.T) {
+	// Same as above but for a constrained dep entry like (cohttp (>= "5.0.0"))
+	// where the atom inside the list must be read correctly past CRLF whitespace.
+	dir := t.TempDir()
+	lf := "(lang dune 3.0)\r\n(generate_opam_files true)\r\n\r\n(package\r\n (name my_app)\r\n (depends\r\n  dune\r\n  (cohttp (>= \"5.0.0\"))))\r\n"
+	writeDuneProjectBytes(t, dir, []byte(lf))
+
+	if err := dune.AddDep(dir, "cohttp", ">=5.0.0"); err != nil {
+		t.Fatalf("AddDep: %v", err)
+	}
+
+	result := readDuneProject(t, dir)
+	count := strings.Count(result, "cohttp")
+	if count != 1 {
+		t.Errorf("expected cohttp exactly once, got %d:\n%s", count, result)
+	}
+}
+
+func TestAddDep_IdempotentCRLFMultiLineConstrainedDep(t *testing.T) {
+	// A constrained dep whose name and constraint are on separate lines (CRLF):
+	//   (cohttp\r\n   (>= "5.0.0"))
+	// containsDepName reads the first atom inside the list; if '\r' is not a
+	// terminator, it reads "cohttp\r" instead of "cohttp" and misses the match.
+	dir := t.TempDir()
+	// dune-project with CRLF where cohttp's name and constraint span two lines
+	raw := "(lang dune 3.0)\r\n(generate_opam_files true)\r\n\r\n(package\r\n (name my_app)\r\n (depends\r\n  dune\r\n  (cohttp\r\n   (>= \"5.0.0\"))))\r\n"
+	writeDuneProjectBytes(t, dir, []byte(raw))
+
+	if err := dune.AddDep(dir, "cohttp", ">=5.0.0"); err != nil {
+		t.Fatalf("AddDep: %v", err)
+	}
+
+	result := readDuneProject(t, dir)
+	count := strings.Count(result, "cohttp")
+	if count != 1 {
+		t.Errorf("expected cohttp exactly once after idempotent add, got %d:\n%q", count, result)
+	}
+}
