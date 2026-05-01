@@ -8,7 +8,7 @@ import (
 )
 
 // CachePathForVersion returns the content-addressed switch path for the given OCaml version.
-// All projects using the same OCaml version share the same switch (dependencies accumulate via opam).
+// Kept for backward compatibility with state.toml entries written by older versions.
 func CachePathForVersion(ocamlVersion string) (string, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
@@ -18,6 +18,39 @@ func CachePathForVersion(ocamlVersion string) (string, error) {
 	fmt.Fprintf(h, "ocaml=%s\n", ocamlVersion)
 	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
 	return filepath.Join(home, ".cache", "oc", "switches", hash), nil
+}
+
+// CachePathForProject returns a per-project switch path, unique to the combination
+// of absolute project directory and OCaml version. This gives each project its own
+// isolated switch while still being deterministic and content-addressed.
+func CachePathForProject(projectDir, ocamlVersion string) (string, error) {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return "", fmt.Errorf("determine home directory: %w", err)
+	}
+	h := sha256.New()
+	fmt.Fprintf(h, "ocaml=%s\nproject=%s\n", ocamlVersion, projectDir)
+	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
+	return filepath.Join(home, ".cache", "oc", "switches", hash), nil
+}
+
+// ListCachedSwitches returns all switch directory paths found under base.
+// In production, base is ~/.cache/oc/switches; tests pass a temp dir.
+func ListCachedSwitches(base string) ([]string, error) {
+	entries, err := os.ReadDir(base)
+	if os.IsNotExist(err) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("read switches dir: %w", err)
+	}
+	var paths []string
+	for _, e := range entries {
+		if e.IsDir() {
+			paths = append(paths, filepath.Join(base, e.Name()))
+		}
+	}
+	return paths, nil
 }
 
 // EnsureSymlink creates or updates the .ocaml symlink in projectDir to point at target.

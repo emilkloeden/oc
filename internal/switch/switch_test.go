@@ -111,6 +111,90 @@ func TestEnsureSymlink_RegularFileReturnsError(t *testing.T) {
 	}
 }
 
+func TestCachePathForProject_Deterministic(t *testing.T) {
+	p1, err := sw.CachePathForProject("/home/user/myproject", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	p2, err := sw.CachePathForProject("/home/user/myproject", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	if p1 != p2 {
+		t.Errorf("CachePathForProject not deterministic: %q vs %q", p1, p2)
+	}
+}
+
+func TestCachePathForProject_DiffersForDifferentVersions(t *testing.T) {
+	p1, err := sw.CachePathForProject("/home/user/myproject", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	p2, err := sw.CachePathForProject("/home/user/myproject", "5.3.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	if p1 == p2 {
+		t.Error("different OCaml versions should produce different cache paths")
+	}
+}
+
+func TestCachePathForProject_DiffersForDifferentProjectDirs(t *testing.T) {
+	p1, err := sw.CachePathForProject("/home/user/projectA", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	p2, err := sw.CachePathForProject("/home/user/projectB", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	if p1 == p2 {
+		t.Error("different project dirs should produce different cache paths")
+	}
+}
+
+func TestCachePathForProject_ContainsExpectedSegments(t *testing.T) {
+	path, err := sw.CachePathForProject("/home/user/myproject", "5.2.0")
+	if err != nil {
+		t.Fatalf("CachePathForProject: %v", err)
+	}
+	if !strings.Contains(path, filepath.Join(".cache", "oc", "switches")) {
+		t.Errorf("unexpected path structure: %q", path)
+	}
+	base := filepath.Base(path)
+	if len(base) != 16 {
+		t.Errorf("expected 16-char hash in path base, got %q (len %d)", base, len(base))
+	}
+}
+
+func TestListCachedSwitches_EmptyWhenNone(t *testing.T) {
+	switches, err := sw.ListCachedSwitches(t.TempDir())
+	if err != nil {
+		t.Fatalf("ListCachedSwitches: %v", err)
+	}
+	if len(switches) != 0 {
+		t.Errorf("expected empty list, got %v", switches)
+	}
+}
+
+func TestListCachedSwitches_ReturnsDirectories(t *testing.T) {
+	base := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(base, "abc123"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.MkdirAll(filepath.Join(base, "def456"), 0755); err != nil {
+		t.Fatal(err)
+	}
+
+	switches, err := sw.ListCachedSwitches(base)
+	if err != nil {
+		t.Fatalf("ListCachedSwitches: %v", err)
+	}
+	if len(switches) != 2 {
+		t.Errorf("expected 2 switches, got %d: %v", len(switches), switches)
+	}
+}
+
 func TestEnsureSymlink_DirectoryReturnsError(t *testing.T) {
 	projectDir := t.TempDir()
 	link := filepath.Join(projectDir, ".ocaml")
