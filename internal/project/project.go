@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 
 	"github.com/BurntSushi/toml"
 )
@@ -62,4 +63,15 @@ func SaveState(dir string, s State) error {
 type Dep struct {
 	Name       string
 	Constraint string
+}
+
+// ParseConstraintParts splits a constraint like ">=5.0.0" into op=">=", ver="5.0.0".
+// Returns op="" if no recognised operator prefix is found.
+func ParseConstraintParts(c string) (op, ver string) {
+	for _, prefix := range []string{">=", "<=", ">", "<", "="} {
+		if strings.HasPrefix(c, prefix) {
+			return prefix, strings.TrimSpace(c[len(prefix):])
+		}
+	}
+	return "", c
 }
