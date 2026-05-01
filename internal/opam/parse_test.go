@@ -132,3 +132,56 @@ func TestRemoveDepFromOpam_ErrorWhenNotPresent(t *testing.T) {
 		t.Fatal("expected error when package not in depends")
 	}
 }
+
+// --- ReadOCamlVersion tests ---
+
+func TestReadOCamlVersion_GeConstraint(t *testing.T) {
+	dir := t.TempDir()
+	writeOpam(t, dir, "my_app", sampleOpam) // contains "ocaml" {>= "4.14"}
+	v, err := opam.ReadOCamlVersion(dir)
+	if err != nil {
+		t.Fatalf("ReadOCamlVersion: %v", err)
+	}
+	if v != "4.14" {
+		t.Errorf("got %q, want %q", v, "4.14")
+	}
+}
+
+func TestReadOCamlVersion_EqConstraint(t *testing.T) {
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+depends: [
+  "ocaml" {= "5.1.0"}
+  "dune" {>= "3.0"}
+]
+`
+	writeOpam(t, dir, "my_app", content)
+	v, err := opam.ReadOCamlVersion(dir)
+	if err != nil {
+		t.Fatalf("ReadOCamlVersion: %v", err)
+	}
+	if v != "5.1.0" {
+		t.Errorf("got %q, want %q", v, "5.1.0")
+	}
+}
+
+func TestReadOCamlVersion_MissingConstraint(t *testing.T) {
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+depends: [
+  "dune" {>= "3.0"}
+]
+`
+	writeOpam(t, dir, "my_app", content)
+	_, err := opam.ReadOCamlVersion(dir)
+	if err == nil {
+		t.Fatal("expected error when no ocaml constraint found")
+	}
+}
+
+func TestReadOCamlVersion_MissingOpamFile(t *testing.T) {
+	_, err := opam.ReadOCamlVersion(t.TempDir())
+	if err == nil {
+		t.Fatal("expected error when no .opam file present")
+	}
+}

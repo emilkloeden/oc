@@ -2,9 +2,9 @@ package cmd
 
 import (
 	"fmt"
-	"io"
-	"os"
+	"strings"
 
+	"github.com/emilkloeden/oc/internal/opam"
 	"github.com/emilkloeden/oc/internal/project"
 	"github.com/spf13/cobra"
 )
@@ -18,34 +18,30 @@ var envCmd = &cobra.Command{
 			return err
 		}
 
-		lock, err := project.LoadLock(dir)
+		ocamlVersion, err := opam.ReadOCamlVersion(dir)
+		if err != nil {
+			ocamlVersion = "(unknown)"
+		}
+
+		state, err := project.LoadState(dir)
 		if err != nil {
 			return err
 		}
 
-		printEnvInfo(os.Stdout, lock)
-
-		if lock.SwitchPath != "" {
-			fmt.Printf("switch   %s\n", lock.SwitchPath)
-		} else {
-			fmt.Printf("switch   (not yet initialised — run 'oc build')\n")
-		}
+		fmt.Print(formatEnvOutput(ocamlVersion, state.SwitchPath))
 		return nil
 	},
 }
 
-func printEnvInfo(w io.Writer, lock *project.Lock) {
-	fmt.Fprintf(w, "ocaml    %s\n", lock.OCaml.Version)
-
-	if len(lock.Packages) == 0 {
-		fmt.Fprintf(w, "packages (no packages installed)\n")
-		return
+func formatEnvOutput(ocamlVersion, switchPath string) string {
+	var b strings.Builder
+	fmt.Fprintf(&b, "ocaml    %s\n", ocamlVersion)
+	if switchPath != "" {
+		fmt.Fprintf(&b, "switch   %s\n", switchPath)
+	} else {
+		fmt.Fprintf(&b, "switch   (not yet initialised — run 'oc build')\n")
 	}
-
-	fmt.Fprintf(w, "packages (%d installed)\n", len(lock.Packages))
-	for _, p := range lock.Packages {
-		fmt.Fprintf(w, "  %-30s %s\n", p.Name, p.Version)
-	}
+	return b.String()
 }
 
 func init() {

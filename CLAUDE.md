@@ -2,7 +2,7 @@
 
 ## What this project is
 
-`oc` is a Go CLI tool that wraps [opam](https://opam.ocaml.org) and [dune](https://dune.build) to give OCaml a Cargo-like developer experience. It manages per-project opam switches transparently, generates opam files from `oc.toml`, and keeps a lockfile of resolved package versions.
+`oc` is a Go CLI tool that wraps [opam](https://opam.ocaml.org) and [dune](https://dune.build) to give OCaml a Cargo-like developer experience. It manages per-project opam switches transparently and uses native `dune-project`/`.opam` files as the project source of truth.
 
 ## Development workflow
 
@@ -103,32 +103,41 @@ GoReleaser builds binaries for Linux/macOS/Windows (amd64 + arm64), creates a Gi
 main.go                  → entry point, delegates to cmd.Execute()
 cmd/                     → cobra commands; no business logic, just routing
   new.go                 → oc new: RunNew(parent, name, lib) is exported for tests
-  add.go                 → oc add: updates oc.toml + opam file, then calls sync.Ensure
+  add.go                 → oc add: updates dune-project/.opam, then calls sync.Ensure
   remove.go              → oc remove: inverse of add
   build.go               → oc build: sync.Ensure → opam exec dune build
   run.go                 → oc run:   sync.Ensure → opam exec dune exec ./bin/main.exe
-  env.go                 → oc env: reads oc.lock, prints OCaml version + packages
-  util.go                → findProjectRoot: walks up from cwd looking for oc.toml
-  export_test.go         → exposes unexported helpers (printEnvInfo, findProjectRoot) for tests
+  env.go                 → oc env: reads OCaml version from .opam, switch path from state
+  migrate.go             → silently migrates oc.lock → .oc/state.toml on upgrade
+  util.go                → findProjectRoot: walks up from cwd looking for dune-project/.opam
+  export_test.go         → exposes unexported helpers (findProjectRoot, formatEnvOutput) for tests
 
-internal/project/        → oc.toml and oc.lock read/write (pure, no subprocess calls)
-  Config struct          → [project], [ocaml], [dependencies], [dev-dependencies]
-  Lock struct            → [ocaml], switch_path, [[package]] list
-  LoadConfig/SaveConfig  → TOML round-trip for oc.toml
-  LoadLock/SaveLock      → TOML round-trip for oc.lock; missing lock returns empty Lock{}
+internal/project/        → .oc/state.toml read/write (pure, no subprocess calls)
+  State struct           → switch_path, ocaml_version (machine-local; gitignored)
+  LoadState/SaveState    → TOML round-trip for .oc/state.toml; missing file returns empty State{}
+  Dep struct             → parsed package name + version constraint from CLI arguments
 
-internal/opam/           → generates <name>.opam from a Config (pure, no subprocess calls)
-  Generate(dir, cfg)     → always emits synopsis, maintainer, ocaml constraint, dune dep
+internal/opam/           → .opam file parsing and manipulation (pure, no subprocess calls)
+  FindOpamFile(dir)      → finds single *.opam file in dir
+  ReadOCamlVersion(dir)  → extracts ocaml version from depends: block
+  AddDepToOpam(path, pkg, constraint) → inserts before closing ]
+  RemoveDepFromOpam(path, pkg)        → line-by-line removal
 
-internal/switch/         → switch hashing and symlink management (package name: swmgr)
-  Hash(lock)             → SHA-256 of sorted "name=version\n" lines, first 16 hex chars
-  CachePath(lock)        → ~/.cache/oc/switches/<hash>
-  EnsureSymlink(dir, target) → creates or updates .ocaml/ symlink in project root
+internal/dune/           → dune-project parsing and manipulation (pure, no subprocess calls)
+  HasGenerateOpamFiles(dir) → checks for (generate_opam_files true)
+  AddDep/RemoveDep(dir, pkg, constraint) → edit (depends ...) block
+  ScaffoldBin/ScaffoldLib(dir, name, maintainer) → create project skeleton
+
+internal/project/detect  → Detect(dir) → TypeDuneManaged | TypeHandWrittenOpam
+
+internal/switch/         → switch path computation and symlink management (package name: swmgr)
+  CachePathForVersion(ocamlVersion) → ~/.cache/oc/switches/<hash> (SHA-256 of ocaml=VERSION)
+  EnsureSymlink(dir, target)        → creates or updates .ocaml/ symlink in project root
 
 internal/sync/           → orchestrates switch lifecycle and dep installation
-  Ensure(dir, cfg)       → real opam runner entry point
-  EnsureWith(dir, cfg, OpamRunner) → injectable for unit tests
-  OpamRunner interface   → SwitchExists, CreateSwitch, InstallDeps, ListInstalled
+  Ensure(dir)            → real opam runner entry point; reads OCaml version from .opam file
+  EnsureWith(dir, ocamlVersion, OpamRunner) → injectable for unit tests
+  OpamRunner interface   → SwitchExists, CreateSwitch, InstallDeps, LockDeps
 
 internal/exec/           → thin subprocess wrapper
   Run(name, args, opts)  → streams stdout/stderr; opts: Dir, Env, Stdout, Stderr
@@ -137,9 +146,11 @@ internal/exec/           → thin subprocess wrapper
 
 ## Key design decisions
 
-**Switch path is stored in oc.lock** (`switch_path` field). The content-addressed hash is computed from the lock before packages are installed; after installation the lock is populated with actual package versions which would change the hash. Persisting the resolved path prevents the switch from being "lost" on the second sync call.
+**Switch path is stored in `.oc/state.toml`** (gitignored). This is machine-local state. The content-addressed path is derived from the OCaml version hash on first run; subsequent runs reuse the stored path for stability. On an OCaml version change, the stored path is discarded and a new one computed.
 
-**opam file is always generated, never edited by users.** `oc.toml` is the single source of truth. `opam.Generate` is called whenever `oc.toml` changes (new, add, remove).
+**`*.opam.locked` is the committed reproducibility artifact** (generated by `opam lock .` after install). Experienced opam users can run `opam install --locked` directly without `oc`.
+
+**`dune-project` and `.opam` are the source of truth for dependencies.** `oc add`/`oc remove` edit these files directly; `oc` does not maintain its own manifest. For dune-managed projects, `dune-project` is edited; for hand-written opam files, the `.opam` file is edited directly.
 
 **`dune` is always included as an implicit dependency** in the generated opam file so `opam install --deps-only` always installs it.
 
@@ -151,10 +162,10 @@ internal/exec/           → thin subprocess wrapper
 
 | File | Owned by | Notes |
 |---|---|---|
-| `oc.toml` | user | edit freely |
-| `oc.lock` | `oc` | generated; commit for reproducibility |
-| `<name>.opam` | `oc` | generated; do not edit |
 | `dune-project` | user | scaffolded once; edit freely |
+| `<name>.opam` | user (dune-managed: generated by dune) | for hand-written: edit directly |
+| `<name>.opam.locked` | `oc` | generated by `opam lock .`; commit for reproducibility |
+| `.oc/state.toml` | `oc` | machine-local; gitignored; do not edit |
 | `bin/dune`, `lib/dune` | user | scaffolded once; edit freely |
 | `.ocaml/` | `oc` | symlink to switch; gitignored |
 
@@ -166,11 +177,13 @@ internal/exec/           → thin subprocess wrapper
 4. Write tests in `cmd/<name>_test.go` using `package cmd_test`.
 5. For logic touching opam, add an integration test in `integration_test.go` with `//go:build integration`.
 
-## Constraint syntax in oc.toml
+## Constraint syntax for `oc add`
 
-| oc.toml value | opam output |
-|---|---|
-| `"*"` | `"pkg"` (no constraint) |
-| `">=5.0.0"` | `"pkg" {>= "5.0.0"}` |
-| `"<=2.0"` | `"pkg" {<= "2.0"}` |
-| `"=1.0.0"` | `"pkg" {= "1.0.0"}` |
+The constraint argument to `oc add <pkg> --constraint <c>` is parsed by `internal/opam/parse.go` and `internal/dune/parse.go`.
+
+| CLI value | dune-project output | opam output |
+|---|---|---|
+| `"*"` or `""` | `pkg` (no constraint) | `"pkg"` |
+| `">=5.0.0"` | `(pkg (>= "5.0.0"))` | `"pkg" {>= "5.0.0"}` |
+| `"<=2.0"` | `(pkg (<= "2.0"))` | `"pkg" {<= "2.0"}` |
+| `"=1.0.0"` | `(pkg (= "1.0.0"))` | `"pkg" {= "1.0.0"}` |

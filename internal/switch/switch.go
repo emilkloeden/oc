@@ -5,32 +5,16 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
-
-	"github.com/emilkloeden/oc/internal/project"
 )
 
-func Hash(lock *project.Lock) string {
-	pkgs := make([]project.Package, len(lock.Packages))
-	copy(pkgs, lock.Packages)
-	sort.Slice(pkgs, func(i, j int) bool {
-		if pkgs[i].Name != pkgs[j].Name {
-			return pkgs[i].Name < pkgs[j].Name
-		}
-		return pkgs[i].Version < pkgs[j].Version
-	})
-
-	h := sha256.New()
-	fmt.Fprintf(h, "ocaml=%s\n", lock.OCaml.Version)
-	for _, p := range pkgs {
-		fmt.Fprintf(h, "%s=%s\n", p.Name, p.Version)
-	}
-	return fmt.Sprintf("%x", h.Sum(nil))[:16]
-}
-
-func CachePath(lock *project.Lock) string {
+// CachePathForVersion returns the content-addressed switch path for the given OCaml version.
+// All projects using the same OCaml version share the same switch (dependencies accumulate via opam).
+func CachePathForVersion(ocamlVersion string) string {
 	home, _ := os.UserHomeDir()
-	return filepath.Join(home, ".cache", "oc", "switches", Hash(lock))
+	h := sha256.New()
+	fmt.Fprintf(h, "ocaml=%s\n", ocamlVersion)
+	hash := fmt.Sprintf("%x", h.Sum(nil))[:16]
+	return filepath.Join(home, ".cache", "oc", "switches", hash)
 }
 
 func EnsureSymlink(projectDir, target string) error {

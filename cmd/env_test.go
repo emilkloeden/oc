@@ -1,7 +1,6 @@
 package cmd_test
 
 import (
-	"bytes"
 	"os"
 	"path/filepath"
 	"strings"
@@ -10,54 +9,6 @@ import (
 	"github.com/emilkloeden/oc/cmd"
 	"github.com/emilkloeden/oc/internal/project"
 )
-
-// loadEnvOutput scaffolds an oc project in a temp dir and captures the env
-// command output by calling the formatting logic directly.
-func loadEnvOutput(t *testing.T, lock *project.Lock) string {
-	t.Helper()
-	var buf bytes.Buffer
-	cmd.PrintEnvInfo(&buf, lock)
-	return buf.String()
-}
-
-func TestEnvOutput_ShowsOCamlVersion(t *testing.T) {
-	lock := &project.Lock{
-		OCaml:    project.OCamlMeta{Version: "5.2.0"},
-		Packages: []project.Package{},
-	}
-	out := loadEnvOutput(t, lock)
-	if !strings.Contains(out, "5.2.0") {
-		t.Errorf("expected OCaml version in output, got:\n%s", out)
-	}
-}
-
-func TestEnvOutput_ShowsPackages(t *testing.T) {
-	lock := &project.Lock{
-		OCaml: project.OCamlMeta{Version: "5.2.0"},
-		Packages: []project.Package{
-			{Name: "cohttp", Version: "5.0.0"},
-			{Name: "lwt", Version: "5.7.0"},
-		},
-	}
-	out := loadEnvOutput(t, lock)
-	if !strings.Contains(out, "cohttp") {
-		t.Errorf("expected cohttp in output, got:\n%s", out)
-	}
-	if !strings.Contains(out, "lwt") {
-		t.Errorf("expected lwt in output, got:\n%s", out)
-	}
-}
-
-func TestEnvOutput_EmptyPackages(t *testing.T) {
-	lock := &project.Lock{
-		OCaml:    project.OCamlMeta{Version: "5.2.0"},
-		Packages: []project.Package{},
-	}
-	out := loadEnvOutput(t, lock)
-	if !strings.Contains(out, "no packages") && !strings.Contains(out, "0 package") {
-		t.Errorf("expected empty package message, got:\n%s", out)
-	}
-}
 
 func TestProjectRoot_FindsDuneProject(t *testing.T) {
 	dir := t.TempDir()
@@ -76,5 +27,43 @@ func TestProjectRoot_FindsDuneProject(t *testing.T) {
 	}
 	if root != dir {
 		t.Errorf("got %q want %q", root, dir)
+	}
+}
+
+func TestFormatEnvOutput_ShowsOCamlVersion(t *testing.T) {
+	out := cmd.FormatEnvOutput("5.2.0", "")
+	if !strings.Contains(out, "5.2.0") {
+		t.Errorf("expected OCaml version in output, got:\n%s", out)
+	}
+}
+
+func TestFormatEnvOutput_ShowsSwitchPath(t *testing.T) {
+	out := cmd.FormatEnvOutput("5.2.0", "/cache/oc/switches/abc123/")
+	if !strings.Contains(out, "/cache/oc/switches/abc123/") {
+		t.Errorf("expected switch path in output, got:\n%s", out)
+	}
+}
+
+func TestFormatEnvOutput_ShowsUninitialised_WhenNoSwitchPath(t *testing.T) {
+	out := cmd.FormatEnvOutput("5.2.0", "")
+	if !strings.Contains(out, "not yet initialised") {
+		t.Errorf("expected uninitialised message in output, got:\n%s", out)
+	}
+}
+
+func TestEnvState_LoadsFromStateFile(t *testing.T) {
+	dir := t.TempDir()
+	if err := project.SaveState(dir, project.State{
+		SwitchPath:   "/cache/switch",
+		OCamlVersion: "5.2.0",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	s, err := project.LoadState(dir)
+	if err != nil {
+		t.Fatalf("LoadState: %v", err)
+	}
+	if s.SwitchPath != "/cache/switch" {
+		t.Errorf("SwitchPath: got %q", s.SwitchPath)
 	}
 }

@@ -68,13 +68,10 @@ func RunNew(parent, name string, lib bool) error {
 		}
 	}
 
-	// Write initial oc.lock with the default OCaml version so sync.Ensure
-	// can create the right switch without needing oc.toml.
-	lock := &project.Lock{
-		OCaml: project.OCamlMeta{Version: "5.2.0"},
-	}
-	if err := project.SaveLock(dir, lock); err != nil {
-		return fmt.Errorf("write oc.lock: %w", err)
+	// Write initial .oc/state.toml so subsequent commands know the OCaml version.
+	state := project.State{OCamlVersion: "5.2.0"}
+	if err := project.SaveState(dir, state); err != nil {
+		return fmt.Errorf("write .oc/state.toml: %w", err)
 	}
 
 	if err := writeGitignore(dir); err != nil {
@@ -88,7 +85,7 @@ func RunNew(parent, name string, lib bool) error {
 }
 
 func writeGitignore(dir string) error {
-	content := ".ocaml/\n_build/\n*.install\n"
+	content := ".ocaml/\n.oc/\n_build/\n*.install\n"
 	return os.WriteFile(filepath.Join(dir, ".gitignore"), []byte(content), 0644)
 }
 

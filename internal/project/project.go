@@ -8,56 +8,45 @@ import (
 	"github.com/BurntSushi/toml"
 )
 
-const lockFile = "oc.lock"
+const stateDir = ".oc"
+const stateFile = "state.toml"
 
-type OCamlMeta struct {
-	Version string `toml:"version"`
+// State holds machine-local oc state. It is stored in .oc/state.toml and never committed.
+type State struct {
+	SwitchPath   string `toml:"switch_path"`
+	OCamlVersion string `toml:"ocaml_version"`
 }
 
-type Package struct {
-	Name    string `toml:"name"`
-	Version string `toml:"version"`
-}
-
-// Dep represents a package name and its version constraint as parsed from CLI arguments.
-type Dep struct {
-	Name       string
-	Constraint string
-}
-
-type Lock struct {
-	OCaml      OCamlMeta `toml:"ocaml"`
-	SwitchPath string    `toml:"switch_path,omitempty"`
-	Packages   []Package `toml:"package"`
-}
-
-func LoadLock(dir string) (*Lock, error) {
-	path := filepath.Join(dir, lockFile)
+// LoadState reads .oc/state.toml. A missing file returns an empty State with no error.
+func LoadState(dir string) (State, error) {
+	path := filepath.Join(dir, stateDir, stateFile)
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
-		return &Lock{}, nil
+		return State{}, nil
 	}
 	if err != nil {
-		return nil, err
+		return State{}, err
 	}
-
-	var lock Lock
-	if _, err := toml.Decode(string(data), &lock); err != nil {
-		return nil, fmt.Errorf("parse oc.lock: %w", err)
+	var s State
+	if _, err := toml.Decode(string(data), &s); err != nil {
+		return State{}, fmt.Errorf("parse .oc/state.toml: %w", err)
 	}
-	return &lock, nil
+	return s, nil
 }
 
-func SaveLock(dir string, lock *Lock) error {
-	path := filepath.Join(dir, lockFile)
-
-	tmp, err := os.CreateTemp(dir, ".oc.lock.*.tmp")
+// SaveState atomically writes .oc/state.toml, creating .oc/ if needed.
+func SaveState(dir string, s State) error {
+	ocDir := filepath.Join(dir, stateDir)
+	if err := os.MkdirAll(ocDir, 0755); err != nil {
+		return err
+	}
+	path := filepath.Join(ocDir, stateFile)
+	tmp, err := os.CreateTemp(ocDir, ".state.*.tmp")
 	if err != nil {
 		return err
 	}
 	tmpPath := tmp.Name()
-
-	if err := toml.NewEncoder(tmp).Encode(lock); err != nil {
+	if err := toml.NewEncoder(tmp).Encode(s); err != nil {
 		_ = tmp.Close()
 		_ = os.Remove(tmpPath)
 		return err
@@ -66,6 +55,11 @@ func SaveLock(dir string, lock *Lock) error {
 		_ = os.Remove(tmpPath)
 		return err
 	}
-
 	return os.Rename(tmpPath, path)
+}
+
+// Dep represents a package name and its version constraint as parsed from CLI arguments.
+type Dep struct {
+	Name       string
+	Constraint string
 }
