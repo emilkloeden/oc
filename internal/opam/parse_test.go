@@ -185,3 +185,28 @@ func TestReadOCamlVersion_MissingOpamFile(t *testing.T) {
 		t.Fatal("expected error when no .opam file present")
 	}
 }
+
+func TestReadOCamlVersion_ReadsFromDependsBlockOnly(t *testing.T) {
+	// Verify the function scans only the depends block, not the full file.
+	// A file with depopts before depends: the depopts block ends with ']' before
+	// depends: opens. If start were incorrectly 0 the scanner would include content
+	// from before the depends block.
+	dir := t.TempDir()
+	content := `opam-version: "2.0"
+depopts: [
+  "threads" {>= "0.1"}
+]
+depends: [
+  "ocaml" {>= "5.2.0"}
+  "dune" {>= "3.0"}
+]
+`
+	writeOpam(t, dir, "my_app", content)
+	v, err := opam.ReadOCamlVersion(dir)
+	if err != nil {
+		t.Fatalf("ReadOCamlVersion: %v", err)
+	}
+	if v != "5.2.0" {
+		t.Errorf("got %q, want %q", v, "5.2.0")
+	}
+}

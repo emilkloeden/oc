@@ -156,12 +156,10 @@ func ReadOCamlVersion(dir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read opam file: %w", err)
 	}
-	_, end, err := findOpamDepsBounds(string(data))
+	start, end, err := findOpamDepsBounds(string(data))
 	if err != nil {
 		return "", fmt.Errorf("find depends block: %w", err)
 	}
-	// start is index after "depends: ["; search only inside the block
-	start, _, _ := findOpamDepsBounds(string(data))
 	block := string(data)[start:end]
 	for _, line := range strings.Split(block, "\n") {
 		trimmed := strings.TrimSpace(line)
