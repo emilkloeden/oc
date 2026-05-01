@@ -74,7 +74,11 @@ func EnsureWith(dir string, ocamlVersion string, runner OpamRunner) error {
 
 	switchPath := state.SwitchPath
 	if switchPath == "" || !runner.SwitchExists(switchPath) {
-		switchPath = swmgr.CachePathForVersion(ocamlVersion)
+		var err error
+		switchPath, err = swmgr.CachePathForVersion(ocamlVersion)
+		if err != nil {
+			return fmt.Errorf("compute switch path: %w", err)
+		}
 	}
 
 	if !runner.SwitchExists(switchPath) {
