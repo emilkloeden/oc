@@ -17,6 +17,11 @@ func CachePathForVersion(ocamlVersion string) string {
 	return filepath.Join(home, ".cache", "oc", "switches", hash)
 }
 
+// EnsureSymlink creates or updates the .ocaml symlink in projectDir to point at target.
+// There is an inherent TOCTOU race between Lstat, Remove, and Symlink: a concurrent
+// process could modify the symlink in that window. This is accepted as low risk because
+// oc is an interactive CLI, not a concurrent daemon. The failure mode is a benign
+// "symlink already exists" error on the second invocation, not data loss.
 func EnsureSymlink(projectDir, target string) error {
 	link := filepath.Join(projectDir, ".ocaml")
 
