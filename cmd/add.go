@@ -28,7 +28,7 @@ var addCmd = &cobra.Command{
 			return err
 		}
 
-		if err := runAdd(dir, deps, addDev); err != nil {
+		if err := runAdd(dir, deps, addDev, sync.Ensure); err != nil {
 			return err
 		}
 
@@ -40,7 +40,7 @@ var addCmd = &cobra.Command{
 }
 
 // runAdd adds deps to the project manifest and syncs.
-func runAdd(dir string, deps []project.Dep, dev bool) error {
+func runAdd(dir string, deps []project.Dep, dev bool, syncFn func(string) error) error {
 	pt, err := project.Detect(dir)
 	if err != nil {
 		return err
@@ -63,7 +63,7 @@ func runAdd(dir string, deps []project.Dep, dev bool) error {
 		}
 	}
 
-	if err := sync.Ensure(dir); err != nil {
+	if err := syncFn(dir); err != nil {
 		return fmt.Errorf("sync: %w", err)
 	}
 	return nil

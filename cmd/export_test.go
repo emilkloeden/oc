@@ -8,3 +8,4 @@ var BuildRunArgs = buildRunArgs
 var ParseAddArgs = parseAddArgs
 var RunBuild = runBuild
 var RunRemove = runRemove
+var RunAdd = runAdd
