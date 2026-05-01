@@ -6,6 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
+	"github.com/emilkloeden/oc/internal/atomicfile"
 	"github.com/emilkloeden/oc/internal/project"
 )
 
@@ -146,7 +147,7 @@ func AddDep(dir, pkg, constraint string) error {
 
 	// Insert new entry before the closing ')' of depends
 	newContent := content[:end] + "\n  " + entry + content[end:]
-	return os.WriteFile(path, []byte(newContent), 0644)
+	return atomicfile.Write(path, []byte(newContent), 0644)
 }
 
 // RemoveDep removes a dependency from the (depends ...) stanza in dune-project.
@@ -175,7 +176,7 @@ func RemoveDep(dir, pkg string) error {
 	}
 
 	newContent := content[:start] + filtered + content[end:]
-	return os.WriteFile(path, []byte(newContent), 0644)
+	return atomicfile.Write(path, []byte(newContent), 0644)
 }
 
 // findDepsBounds locates the interior of the (depends ...) block in a dune-project.
