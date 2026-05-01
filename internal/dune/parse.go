@@ -272,45 +272,107 @@ func containsDepName(block, pkg string) bool {
 
 // removeDuneDepEntry removes the dep entry for pkg from the interior of a depends block.
 // Returns the modified interior and true if pkg was found, or the original interior and false if not.
+// Uses a character-level scanner so multi-line entries are handled correctly.
 func removeDuneDepEntry(interior, pkg string) (string, bool) {
-	// We'll scan line by line looking for the dep
-	lines := strings.Split(interior, "\n")
-	result := make([]string, 0, len(lines))
+	var out strings.Builder
+	i := 0
 	found := false
-	for _, line := range lines {
-		trimmed := strings.TrimSpace(line)
-		// Check if this line starts the entry for pkg
-		if isDepLine(trimmed, pkg) {
-			found = true
-			// If this line has balanced parens (single-line entry), skip it
-			// If unbalanced, we need to also skip following lines until balanced
-			depth := countParenDepth(trimmed)
-			if depth == 0 {
-				continue // single-line entry fully removed
+	inString := false
+
+	for i < len(interior) {
+		c := interior[i]
+
+		if inString {
+			if c == '"' {
+				inString = false
+			} else if c == '\\' {
+				out.WriteByte(c)
+				i++
+				if i < len(interior) {
+					out.WriteByte(interior[i])
+					i++
+				}
+				continue
 			}
-			// Multi-line: keep skipping until depth returns to 0
-			// (For our generated format, entries are always single-line)
+			out.WriteByte(c)
+			i++
 			continue
 		}
-		result = append(result, line)
+
+		if c == '"' {
+			inString = true
+			out.WriteByte(c)
+			i++
+			continue
+		}
+
+		if c == '(' {
+			// Peek at the first atom inside this list to see if it matches pkg.
+			j := i + 1
+			for j < len(interior) && (interior[j] == ' ' || interior[j] == '\t' || interior[j] == '\n' || interior[j] == '\r') {
+				j++
+			}
+			atomEnd := j
+			for atomEnd < len(interior) && interior[atomEnd] != ' ' && interior[atomEnd] != '\t' &&
+				interior[atomEnd] != '\n' && interior[atomEnd] != '\r' &&
+				interior[atomEnd] != ')' && interior[atomEnd] != '(' {
+				atomEnd++
+			}
+			name := interior[j:atomEnd]
+			if name == pkg {
+				// Skip this entire entry (to matching ')').
+				found = true
+				depth := 1
+				i++
+				for i < len(interior) && depth > 0 {
+					switch interior[i] {
+					case '(':
+						depth++
+					case ')':
+						depth--
+					case '"':
+						i++
+						for i < len(interior) && interior[i] != '"' {
+							if interior[i] == '\\' {
+								i++
+							}
+							i++
+						}
+					}
+					i++
+				}
+				continue
+			}
+			out.WriteByte(c)
+			i++
+			continue
+		}
+
+		// Bare atom — read it and check if it matches.
+		if c != ' ' && c != '\t' && c != '\n' && c != '\r' && c != ')' {
+			start := i
+			for i < len(interior) && interior[i] != ' ' && interior[i] != '\t' &&
+				interior[i] != '\n' && interior[i] != '\r' &&
+				interior[i] != ')' && interior[i] != '(' {
+				i++
+			}
+			atom := interior[start:i]
+			if atom == pkg {
+				found = true
+				continue
+			}
+			out.WriteString(atom)
+			continue
+		}
+
+		out.WriteByte(c)
+		i++
 	}
+
 	if !found {
 		return interior, false
 	}
-	return strings.Join(result, "\n"), true
-}
-
-// isDepLine reports whether a trimmed line is the dep entry for pkg.
-func isDepLine(trimmed, pkg string) bool {
-	// Bare atom: exactly the pkg name
-	if trimmed == pkg {
-		return true
-	}
-	// List starting with pkg: "(pkg ..."
-	if strings.HasPrefix(trimmed, "("+pkg+" ") || strings.HasPrefix(trimmed, "("+pkg+")") {
-		return true
-	}
-	return false
+	return out.String(), true
 }
 
 // countParenDepth returns the net paren depth of a string (opens - closes).
